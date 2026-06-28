@@ -36,6 +36,13 @@ ask before assuming.
   (case-insensitive); empty-match shows a "No people match" state. Added a `close` icon to the
   `IconName` registry. No API/contract change — filtering is purely client-side over the existing
   store.
+- **People balance filter (2026-06-29):** the People list header has a filter row — **All /
+  Owed to you / You owe** (each with a live count) — narrowing the list by sign of balance.
+  Combines with the search query; client-side only, no API/contract change.
+- **People pagination (2026-06-29):** the People list is paginated client-side at **8 per page**
+  with a **Prev / "Page N of M" / Next** bar (hidden when the result fits on one page). Page
+  resets to 1 when search/filter change and clamps if the list shrinks. No API/contract change;
+  when the backend contract lands, this can move to server-side paging.
 
 ## OPEN — must be decided with the user before implementing
 

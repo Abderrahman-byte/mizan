@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardHeading, Icon, Pill } from '@/components';
 import type { Person } from '@/types';
 import { formatDH, formatNumber } from '@/utils/format';
@@ -7,20 +7,39 @@ import { PersonRow } from './PersonRow';
 import { PersonDetail } from './PersonDetail';
 import { OWE_YOU, YOU_OWE } from './person-helpers';
 
+/** People-list balance filter: everyone, only those who owe you, only those you owe. */
+type BalanceFilter = 'all' | 'owed' | 'owe';
+
+/** People shown per page in the list. */
+const PAGE_SIZE = 8;
+
 export function PeopleScreen() {
   const { people, historyFor } = usePeople();
   const [selected, setSelected] = useState<Person | null>(null);
   const [mobileOpen, setMobileOpen] = useState<Person | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<BalanceFilter>('all');
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return people;
-    return people.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.note.toLowerCase().includes(q),
-    );
-  }, [people, query]);
+    return people.filter((p) => {
+      if (filter === 'owed' && p.balance <= 0) return false;
+      if (filter === 'owe' && p.balance >= 0) return false;
+      if (q && !p.name.toLowerCase().includes(q) && !p.note.toLowerCase().includes(q)) {
+        return false;
+      }
+      return true;
+    });
+  }, [people, query, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Reset to the first page whenever the result set changes.
+  useEffect(() => setPage(1), [query, filter]);
+  // Clamp if the list shrinks (e.g. people removed) below the current page.
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const totals = useMemo(() => {
     const loans = people.filter((p) => p.balance > 0).reduce((s, p) => s + p.balance, 0);
@@ -86,12 +105,17 @@ export function PeopleScreen() {
           </button>
         </div>
       )}
+      <div className="flex gap-1.5 px-2 pb-2.5">
+        <FilterTab label="All" count={people.length} active={filter === 'all'} onClick={() => setFilter('all')} />
+        <FilterTab label="Owed to you" count={totals.oweCount} color={OWE_YOU} active={filter === 'owed'} onClick={() => setFilter('owed')} />
+        <FilterTab label="You owe" count={totals.debtCount} color={YOU_OWE} active={filter === 'owe'} onClick={() => setFilter('owe')} />
+      </div>
       {filtered.length === 0 ? (
         <div className="px-2 py-8 text-center text-[13px] text-ink-soft">
-          No people match “{query.trim()}”.
+          {query.trim() ? `No people match “${query.trim()}”.` : 'No people in this filter.'}
         </div>
       ) : (
-        filtered.map((person) => (
+        paged.map((person) => (
           <PersonRow
             key={person.name}
             person={person}
@@ -102,6 +126,30 @@ export function PeopleScreen() {
             }}
           />
         ))
+      )}
+      {totalPages > 1 && (
+        <div className="mt-1 flex items-center justify-between gap-2 px-2 pt-2.5">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-[12.5px] font-extrabold text-ink-soft transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            <Icon name="chevL" size={14} /> Prev
+          </button>
+          <span className="text-[12.5px] font-bold text-ink-soft">
+            Page <span className="num text-ink">{currentPage}</span> of{' '}
+            <span className="num text-ink">{totalPages}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-[12.5px] font-extrabold text-ink-soft transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            Next <Icon name="chevR" size={14} />
+          </button>
+        </div>
       )}
     </Card>
   );
@@ -172,6 +220,40 @@ export function PeopleScreen() {
         )}
       </div>
     </>
+  );
+}
+
+function FilterTab({
+  label,
+  count,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  color?: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={
+        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-extrabold transition ' +
+        (active
+          ? 'border-accent-tint bg-accent-soft text-accent-ink'
+          : 'border-line text-ink-soft hover:bg-surface-2')
+      }
+    >
+      {color && (
+        <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+      )}
+      {label}
+      <span className="num text-ink-faint">{count}</span>
+    </button>
   );
 }
 

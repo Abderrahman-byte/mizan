@@ -52,5 +52,9 @@ Real Tailwind breakpoints replace the prototype's JS width measurement and phone
 **TabBar** shows below it. Mobile-specific layouts: Budget Modes switches from the side-by-side
 grid to a one-mode-at-a-time editor; People switches from list+detail to a list with drill-in.
 The People list header has a **Search** toggle that swaps in an inline search field, filtering
-the list client-side by name or note (Escape or the close button exits).
+the list client-side by name or note (Escape or the close button exits), plus a **balance
+filter** row (All / Owed to you / You owe, each with a count) that narrows the list by sign of
+balance. Search and balance filter combine. The list is **paginated** at 8 people per page with a
+Prev / "Page N of M" / Next bar (hidden when it fits on one page); changing the search or filter
+resets to page 1.
 All money is in Dirham, formatted via `formatDH` in `src/utils/format.ts`.
