@@ -1,0 +1,133 @@
+/* ============================================================
+   Mizan — Bloom design system.
+   Token-driven theme ported from the approved Bloom prototype.
+   Semantic values live as CSS custom properties on :root / .dark
+   (so dark mode is a single class flip) and are surfaced to
+   Tailwind utilities through @theme below.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap');
+@import 'tailwindcss';
+
+/* class-based dark mode: `dark:` variants apply under .dark */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- raw semantic tokens (light) ---------- */
+:root {
+  --bg: #f6f4fb;
+  --surface: #ffffff;
+  --surface-2: #f2eefc;
+  --surface-3: #ece7f8;
+  --ink: #2f2a3a;
+  --ink-soft: #6f6880;
+  --ink-faint: #a59fb5;
+  --line: #eae7f5;
+  --accent: #7b61d6;
+  --good: #2fa56f;
+  --warn: #e0734f;
+  --cool: #4f7fd6;
+
+  /* five spending-mode colors, lean -> indulgent */
+  --m0: oklch(0.74 0.13 152);
+  --m1: oklch(0.72 0.11 200);
+  --m2: oklch(0.70 0.12 268);
+  --m3: oklch(0.72 0.13 28);
+  --m4: oklch(0.68 0.15 346);
+
+  /* derived accent tints — resolve dynamically against the active accent */
+  --accent-ink: color-mix(in oklch, var(--accent) 80%, var(--ink));
+  --accent-soft: color-mix(in oklch, var(--accent) 14%, var(--surface));
+  --accent-tint: color-mix(in oklch, var(--accent) 20%, transparent);
+
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 26px;
+  --shadow: 0 2px 6px rgba(80, 60, 140, 0.06), 0 14px 36px rgba(80, 60, 140, 0.1);
+  --shadow-sm: 0 2px 6px rgba(80, 60, 140, 0.05), 0 5px 14px rgba(80, 60, 140, 0.06);
+}
+
+/* ---------- dark overrides ---------- */
+.dark {
+  --bg: #18151f;
+  --surface: #221d2c;
+  --surface-2: #2b2538;
+  --surface-3: #342c44;
+  --ink: #f0ecfa;
+  --ink-soft: #b3abc9;
+  --ink-faint: #7e7796;
+  --line: #352d47;
+  --accent: #9d83f0;
+  --good: #46c389;
+  --warn: #f08a64;
+  --cool: #76a0ec;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 14px 36px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.34);
+}
+
+/* ---------- surface tokens for Tailwind utilities ---------- */
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-tint: var(--accent-tint);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-cool: var(--cool);
+
+  --color-mode-0: var(--m0);
+  --color-mode-1: var(--m1);
+  --color-mode-2: var(--m2);
+  --color-mode-3: var(--m3);
+  --color-mode-4: var(--m4);
+
+  /* radii & shadows are consumed as `rounded-[var(--radius-lg)]` /
+     `shadow-[var(--shadow-sm)]`; the raw vars live on :root above. */
+
+  --font-head: 'Quicksand', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+}
+
+/* ---------- base ---------- */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+  /* tabular figures for all money / numeric readouts */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--surface-3);
+    border-radius: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
