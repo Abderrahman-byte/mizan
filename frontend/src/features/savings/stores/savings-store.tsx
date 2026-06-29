@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -7,12 +8,14 @@ import {
   type ReactNode,
 } from 'react';
 import type { SavingsGoal } from '@/types';
-import { getSavingsGoal } from '../api/savings-api';
+import { getSavingsGoal, updateSavingsGoal, type SavingsGoalPatch } from '../api/savings-api';
 
 interface SavingsContextValue {
   savings: SavingsGoal | null;
   loading: boolean;
   error: string | null;
+  /** Update the goal's target amount and/or label. */
+  update: (patch: SavingsGoalPatch) => void;
 }
 
 const SavingsContext = createContext<SavingsContextValue | null>(null);
@@ -33,9 +36,14 @@ export function SavingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const update = useCallback((patch: SavingsGoalPatch) => {
+    setSavings((prev) => (prev ? { ...prev, ...patch } : prev));
+    void updateSavingsGoal(patch);
+  }, []);
+
   const value = useMemo<SavingsContextValue>(
-    () => ({ savings, loading, error }),
-    [savings, loading, error],
+    () => ({ savings, loading, error, update }),
+    [savings, loading, error, update],
   );
 
   return <SavingsContext.Provider value={value}>{children}</SavingsContext.Provider>;

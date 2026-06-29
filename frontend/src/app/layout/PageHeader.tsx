@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SettingsButton } from './SettingsButton';
 import { ThemeToggle } from './ThemeToggle';
 
 export interface PageHeaderProps {
@@ -24,6 +25,7 @@ export function PageHeader({ title, mobileTitle, subtitle, action }: PageHeaderP
       </div>
       <div className="flex flex-none items-center gap-2.5">
         {action}
+        <SettingsButton />
         <ThemeToggle />
       </div>
     </div>

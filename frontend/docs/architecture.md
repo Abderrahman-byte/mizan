@@ -77,13 +77,17 @@ feature folders.
 ## Routing (confirmed)
 
 - `react-router-dom` via `createBrowserRouter` (`src/app/routes/router.tsx`). One route per
-  screen: `/` (Dashboard), `/summary`, `/ledger`, `/modes`, `/people`; unknown paths redirect to
-  `/`. The `AppLayout` shell (sidebar + scrolling content + mobile tab bar) is the route root and
-  renders an `<Outlet/>`. Nav config is shared by the sidebar and tab bar via
-  `src/app/layout/nav-items.ts`.
+  screen: `/` (Dashboard), `/summary`, `/ledger`, `/modes`, `/people`, `/settings`; unknown paths
+  redirect to `/`. The `AppLayout` shell (sidebar + scrolling content + mobile tab bar) is the
+  route root and renders an `<Outlet/>`. Nav config is shared by the sidebar and tab bar via
+  `src/app/layout/nav-items.ts`; Settings is reached via a gear button in the `PageHeader`
+  (`src/app/layout/SettingsButton.tsx`), not the primary nav. `/signin`, `/signup`, `/forgot-password`, and `/reset-password` are
+  **top-level routes outside `AppLayout`** (no sidebar/tab bar) — they render their own
+  full-screen `AuthLayout`.
 - Screen ownership: Ledger → `features/transactions`, Budget Modes → `features/budget`, People →
-  `features/people` (each exposes a presentational screen component). Dashboard and Summary are
-  composite, so they live in `src/app/routes/` and pull from multiple feature hooks.
+  `features/people`, Settings → `features/settings`, auth → `features/auth` (each exposes
+  presentational components). Dashboard and Summary are composite, so they live in
+  `src/app/routes/` and pull from multiple feature hooks.
 
 ## Mock data layer (no API yet)
 

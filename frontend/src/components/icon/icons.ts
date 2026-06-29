@@ -44,6 +44,7 @@ const PATHS = {
   trend: '<path d="M3 17l5-5 4 3 7-8"/><path d="M19 7h-3M19 7v3"/>',
   chart: '<rect x="4" y="13" width="4" height="7" rx="1"/><rect x="10" y="8" width="4" height="12" rx="1"/><rect x="16" y="4" width="4" height="16" rx="1"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>',
+  cog: '<circle cx="12" cy="12" r="3.5"/><path d="M12 2v2.5M12 19.5V22M22 12h-2.5M4.5 12H2M19.07 4.93l-1.77 1.77M6.7 17.3l-1.77 1.77M19.07 19.07l-1.77-1.77M6.7 6.7 4.93 4.93"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

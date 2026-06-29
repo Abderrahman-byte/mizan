@@ -244,4 +244,9 @@ export const db: MockDb = {
 db.transactions = [...generateHistoryTransactions(db.history), ...db.transactions];
 
 /** The current user (display only). */
-export const currentUser = { name: 'Yassine A.', firstName: 'Yassine', initials: 'YA' };
+export const currentUser = {
+  name: 'Yassine A.',
+  firstName: 'Yassine',
+  initials: 'YA',
+  email: 'yassine.alami@gmail.com',
+};

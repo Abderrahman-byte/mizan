@@ -65,6 +65,36 @@ ask before assuming.
   `ACTIVE_MONTH` (`2026-06`) so seeded history doesn't inflate live figures. Past months remain
   **read-only** (editing would desync from the history summary). Mock-only; no API/contract change.
 
+- **Settings screen v1 (2026-06-29):** new `/settings` route, owned by a new `features/settings`
+  (presentational `SettingsScreen`); data wired in `app/routes/settings-page.tsx`. Reached via a
+  **gear button in the `PageHeader`** (`SettingsButton`, new `cog` icon) — *not* added to the
+  primary sidebar/tab-bar nav. v1 contains: **Savings goal** (edit target amount + label — new
+  `updateSavingsGoal` api + `update` on the savings store, optimistic, mock-backed) and a
+  **display-only Profile** card (name/email/initials from `currentUser`, which gained a display
+  `email` field). Profile editing, password, and sign-out are explicitly deferred until **auth**
+  exists. Theme/Monthly income/Category management were considered but left out of v1. No
+  API/contract change beyond the mock savings patch.
+- **Auth screen structure (2026-06-29):** auth is **two separate routes** (`/signin`, `/signup`),
+  not a single tabbed page — chosen for redirect-to-login, distinct URLs, and future flows
+  (forgot/reset password). Both are **top-level routes outside `AppLayout`** (no sidebar/tab bar),
+  owned by a new `features/auth` (`AuthLayout`, `SignInForm`, `SignUpForm`, `PasswordField`); the
+  route pages live in `app/routes/`. **Front-end shells only** — fields, client-side validation,
+  show/hide password, and cross-links; a valid submit currently just `navigate('/')` into the app
+  (marked with `// TODO: confirm` where real auth goes). Real authentication (API calls, token
+  storage, Axios interceptor, route guards / redirect-to-`/signin`) is **still OPEN** — see below.
+- **Forgot-password screen (2026-06-29):** added `/forgot-password` (same top-level/`AuthLayout`
+  pattern; `ForgotPasswordForm` in `features/auth`). Email field → a "Check your inbox"
+  confirmation state (with "use a different email" / "back to sign in"); the confirmation copy is
+  account-enumeration-safe ("If an account exists…"). Sign-in now links to it via a "Forgot
+  password?" link. **Shell only** — no real reset email/endpoint yet (`// TODO: confirm` in
+  `forgot-password-page.tsx`); the actual reset remains OPEN.
+- **Reset-password screen (2026-06-29):** added `/reset-password` (same top-level/`AuthLayout`
+  pattern; `ResetPasswordForm` in `features/auth`). Reads the reset `token` from the query string
+  (`useSearchParams`): **no token → "Link expired"** state (→ request a new link); **token →**
+  new-password + confirm form (min 8, must match); **on submit →** "Password updated" success
+  (→ sign in). **Shell only** — token isn't validated and no real reset endpoint is called
+  (`// TODO: confirm` in `reset-password-page.tsx`). Real reset behavior remains OPEN.
+
 ## OPEN — must be decided with the user before implementing
 
 > Do **not** invent any of the following. Ask, then record here.
@@ -76,8 +106,11 @@ ask before assuming.
   lands (see `mock-data.md` for the swap recipe). Build real types from the confirmed contract.
 
 ### Auth
-- Sign-up / login flow, token storage, and the request-auth interceptor. Not yet built; the
-  Axios client has a placeholder for it.
+- The `/signin` and `/signup` **UI shells** exist (see Confirmed above), but the **behavior** is
+  open: the real sign-up/login API calls, token storage, the request-auth interceptor, and route
+  guards (redirecting unauthenticated users to `/signin` and back). Not yet built; the Axios
+  client has a placeholder for it. Resolve the `// TODO: confirm` markers in `signin-page.tsx` /
+  `signup-page.tsx` when this lands.
 
 ---
 
