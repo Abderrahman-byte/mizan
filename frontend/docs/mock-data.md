@@ -13,7 +13,12 @@ change. This is a deliberate, confirmed decision (see `decisions.md`).
   `PersonEntry`, `SavingsGoal`, `MonthHistory`, `ModeIndex`, …). These are the contract both the
   mock and the future Axios layer produce.
 - **`src/lib/mock/db.ts`** — the single in-memory source of truth (seeded from the prototype's
-  data). Only feature `api/` modules read or mutate it.
+  data). Only feature `api/` modules read or mutate it. Transactions for the current month
+  (June 2026) are hand-authored; **past-month transactions are synthesized** at module load from
+  each `history` row so their `out`/`in` sums equal that month's `spent`/`income` (see
+  `generateHistoryTransactions`). A `Transaction.date` is an ISO calendar date (`YYYY-MM-DD`);
+  the Ledger filters the feed by the displayed month, and current-month spend/income aggregation
+  in `transactions-store` is scoped to the active month (`2026-06`).
 - **`src/lib/mock/mock-request.ts`** — `mockRequest(produce)` resolves a value as a Promise after
   a small simulated latency and returns a deep clone (callers can't mutate the store by
   reference). This keeps the `api/` functions async, exercising loading states.

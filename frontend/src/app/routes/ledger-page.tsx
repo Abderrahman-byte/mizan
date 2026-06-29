@@ -9,6 +9,7 @@ import {
   type LedgerViewModel,
 } from '@/features/transactions';
 import { computeMode } from '@/utils/budget';
+import { MONTHS_SHORT } from '@/utils/date';
 import { PageContainer, PageHeader } from '../layout';
 import { useMonthMode } from '../hooks/use-month-mode';
 import { PageError, PageLoading } from './page-status';
@@ -66,19 +67,22 @@ export function LedgerPage() {
   const isCurrent = cur === last;
   const monthActual = isCurrent ? totalActual : hm.spent;
 
+  // The transactions dated within the displayed month (ISO `YYYY-MM` prefix).
+  const ym = `20${hm.year}-${String(MONTHS_SHORT.indexOf(hm.month) + 1).padStart(2, '0')}`;
+  const monthTransactions = transactions.filter((t) => t.date.startsWith(ym));
+
   const view: LedgerViewModel = {
     modeIdx: (isCurrent ? mode : computeMode(monthActual, totals)).idx,
     totals,
     totalActual: monthActual,
     incomeIn: isCurrent ? incomeIn : hm.income,
     monthLabel: `${FULL_MONTH[hm.month]} 20${hm.year}`,
-    shortMonth: hm.month,
     isCurrent,
     canPrev: cur > 0,
     canNext: cur < last,
     onPrev: () => setMonthIdx(Math.max(0, cur - 1)),
     onNext: () => setMonthIdx(Math.min(last, cur + 1)),
-    transactions: isCurrent ? transactions : [],
+    transactions: monthTransactions,
   };
 
   return (

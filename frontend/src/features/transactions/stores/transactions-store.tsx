@@ -26,6 +26,9 @@ interface TransactionsContextValue {
 
 const TransactionsContext = createContext<TransactionsContextValue | null>(null);
 
+/** The live month (ISO `YYYY-MM` prefix); actuals/income aggregate only this. */
+const ACTIVE_MONTH = '2026-06';
+
 export function TransactionsProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,13 +62,19 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const actuals = useMemo<ActualsMap>(() => {
     const map: ActualsMap = {};
     for (const t of transactions) {
-      if (t.direction === 'out') map[t.category] = (map[t.category] ?? 0) + t.amount;
+      if (t.direction === 'out' && t.date.startsWith(ACTIVE_MONTH)) {
+        map[t.category] = (map[t.category] ?? 0) + t.amount;
+      }
     }
     return map;
   }, [transactions]);
 
   const incomeIn = useMemo(
-    () => transactions.reduce((sum, t) => sum + (t.direction === 'in' ? t.amount : 0), 0),
+    () =>
+      transactions.reduce(
+        (sum, t) => sum + (t.direction === 'in' && t.date.startsWith(ACTIVE_MONTH) ? t.amount : 0),
+        0,
+      ),
     [transactions],
   );
 

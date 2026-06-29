@@ -2,6 +2,7 @@ import { Card, Eyebrow, Icon, Metric, ModeSpectrum, MonthNav } from '@/component
 import { MODE_LABELS, modeColor } from '@/config/modes';
 import type { Category, Money, Transaction } from '@/types';
 import { formatDH } from '@/utils/format';
+import { formatMonthDay } from '@/utils/date';
 import { TransactionRow } from './TransactionRow';
 
 /** Everything the Ledger screen needs for the active (or a past) month. */
@@ -11,8 +12,6 @@ export interface LedgerViewModel {
   totalActual: Money;
   incomeIn: Money;
   monthLabel: string;
-  /** Short month name for day group headers, e.g. "Jun". */
-  shortMonth: string;
   isCurrent: boolean;
   canPrev: boolean;
   canNext: boolean;
@@ -33,7 +32,7 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
   const over = view.totalActual - view.totals[idx];
   const net = view.incomeIn - view.totalActual;
 
-  const groups = groupByDay(view.transactions);
+  const groups = groupByDate(view.transactions);
 
   return (
     <>
@@ -85,7 +84,7 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
             <Icon name={view.isCurrent ? 'spark' : 'check'} size={14} />{' '}
             {view.isCurrent
               ? 'Recalculates live as you edit a transaction'
-              : 'A closed month — switch to June to edit'}
+              : 'A past month — amounts are read-only here'}
           </div>
         </div>
       </Card>
@@ -117,9 +116,9 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
       <Card flush className="px-4 lg:px-6">
         {groups.length ? (
           groups.map((g) => (
-            <div key={g.day}>
+            <div key={g.date}>
               <div className="px-1 pb-[7px] pt-4 text-xs font-extrabold uppercase tracking-[0.05em] text-ink-faint first:pt-2">
-                {view.shortMonth} {g.day}
+                {formatMonthDay(g.date)}
               </div>
               {g.items.map((t) => (
                 <TransactionRow
@@ -133,40 +132,42 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
             </div>
           ))
         ) : (
-          <ClosedMonthEmpty label={view.monthLabel} />
+          <EmptyMonth label={view.monthLabel} />
         )}
       </Card>
     </>
   );
 }
 
-function ClosedMonthEmpty({ label }: { label: string }) {
+function EmptyMonth({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center gap-2.5 py-5 text-center text-ink-soft">
       <span className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-accent-soft text-accent-ink">
         <Icon name="ledger" size={20} />
       </span>
-      <div className="text-[15.5px] font-bold text-ink">{label} is closed</div>
+      <div className="text-[15.5px] font-bold text-ink">No transactions in {label}</div>
       <div className="max-w-[38ch] text-[13.5px]">
-        Per-transaction detail isn't kept for past months — the totals above are this month's
-        summary. Jump back to June to edit live.
+        Nothing was recorded this month. Add one from June, or switch months to review your
+        history.
       </div>
     </div>
   );
 }
 
-interface DayGroup {
-  day: number;
+interface DateGroup {
+  date: string;
   items: Transaction[];
 }
 
-function groupByDay(transactions: Transaction[]): DayGroup[] {
-  const sorted = [...transactions].sort((a, b) => b.day - a.day || b.id - a.id);
-  const groups: DayGroup[] = [];
+function groupByDate(transactions: Transaction[]): DateGroup[] {
+  const sorted = [...transactions].sort((a, b) =>
+    a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id,
+  );
+  const groups: DateGroup[] = [];
   for (const t of sorted) {
-    let g = groups.find((x) => x.day === t.day);
+    let g = groups.find((x) => x.date === t.date);
     if (!g) {
-      g = { day: t.day, items: [] };
+      g = { date: t.date, items: [] };
       groups.push(g);
     }
     g.items.push(t);

@@ -22,11 +22,11 @@ export interface Category {
   icon: IconName;
 }
 
-/** A single ledger transaction for the active month. */
+/** A single ledger transaction. */
 export interface Transaction {
   id: number;
-  /** Day of month (1–31). */
-  day: number;
+  /** Calendar date, ISO `YYYY-MM-DD`. */
+  date: string;
   description: string;
   category: string;
   amount: Money;

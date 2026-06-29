@@ -4,6 +4,9 @@ import type { Category, TransactionDirection } from '@/types';
 import { cn } from '@/utils/cn';
 import type { NewTransaction } from '../api/transactions-api';
 
+/** Today within the app's fixed demo timeline (June 2026). */
+const TODAY = '2026-06-29';
+
 export interface AddTransactionModalProps {
   categories: Category[];
   onClose: () => void;
@@ -16,7 +19,7 @@ export function AddTransactionModal({ categories, onClose, onAdd }: AddTransacti
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Groceries');
   const [description, setDescription] = useState('');
-  const [day, setDay] = useState(26);
+  const [date, setDate] = useState(TODAY);
 
   const valid = Number(amount) > 0;
   // expense categories with Savings pushed to the end
@@ -28,7 +31,7 @@ export function AddTransactionModal({ categories, onClose, onAdd }: AddTransacti
   const submit = () => {
     if (!valid) return;
     onAdd({
-      day,
+      date,
       description: description.trim() || (direction === 'in' ? 'Income' : category),
       category: direction === 'in' ? 'Income' : category,
       amount: Math.round(Number(amount)),
@@ -115,17 +118,13 @@ export function AddTransactionModal({ categories, onClose, onAdd }: AddTransacti
       />
 
       <FieldLabel>Date</FieldLabel>
-      <div className="flex items-center gap-3">
-        <Stepper onClick={() => setDay((d) => Math.max(1, d - 1))} ariaLabel="Earlier">
-          −
-        </Stepper>
-        <div className="num flex-1 rounded-[var(--radius)] border-[1.5px] border-line bg-surface py-2.5 text-center text-[15.5px] font-extrabold">
-          June {day}, 2026
-        </div>
-        <Stepper onClick={() => setDay((d) => Math.min(30, d + 1))} ariaLabel="Later">
-          +
-        </Stepper>
-      </div>
+      <TextField
+        type="date"
+        value={date}
+        max={TODAY}
+        onChange={(e) => setDate(e.target.value)}
+        className="[&::-webkit-calendar-picker-indicator]:cursor-pointer"
+      />
     </Modal>
   );
 }
@@ -177,26 +176,6 @@ function CategoryChip({
         'inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-3 py-2.5 text-[13px] font-bold transition',
         on ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-surface text-ink-soft',
       )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Stepper({
-  onClick,
-  ariaLabel,
-  children,
-}: {
-  onClick: () => void;
-  ariaLabel: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      aria-label={ariaLabel}
-      onClick={onClick}
-      className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border-[1.5px] border-line bg-surface text-[19px] leading-none text-ink hover:bg-surface-2"
     >
       {children}
     </button>

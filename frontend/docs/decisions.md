@@ -44,6 +44,27 @@ ask before assuming.
   resets to 1 when search/filter change and clamps if the list shrinks. No API/contract change;
   when the backend contract lands, this can move to server-side paging.
 
+- **Add-transaction date picker (2026-06-29):** the day-stepper (`− June {day}, 2026 +`) in
+  `AddTransactionModal` was replaced with a native `<input type="date">` (styled via the shared
+  `TextField`). Simple, OS-native picker — supports any month/year, mobile-friendly — capped at
+  today via `max` (future blocked, trivially removable) and defaulting to today. (An interim
+  custom calendar-grid primitive was tried and dropped in favour of the native field.)
+- **Transaction date shape (2026-06-29):** `Transaction.day: number` (day-of-month, implicitly
+  the active month) was replaced with `Transaction.date: string` — an ISO **calendar date**
+  (`YYYY-MM-DD`, no time/timezone, sorts as a string), so a transaction can carry any month/year.
+  Drove the picker change above; the ledger feed groups by full date (`src/utils/date.ts`
+  helpers). **Data-shape change** (frontend types + mock data); signals the eventual API
+  contract — reconcile when the backend contract lands (per `mock-data.md`).
+- **Per-month ledger scoping + history (2026-06-29):** the Ledger now shows transactions for the
+  **displayed** month (filtered by ISO `YYYY-MM` prefix), not just the current one — past months
+  are browsable, not "closed". The "Per-transaction detail isn't kept for past months" empty state
+  was removed (now a neutral "No transactions in {month}"). Past-month transactions are
+  **synthesized** in `lib/mock/db.ts` from each `history` row so the feed's out-sum/in-sum equal
+  that month's `spent`/`income` (recap and feed always agree); the current month keeps its
+  hand-authored detail. Current-month spend/income aggregation (`transactions-store`) is scoped to
+  `ACTIVE_MONTH` (`2026-06`) so seeded history doesn't inflate live figures. Past months remain
+  **read-only** (editing would desync from the history summary). Mock-only; no API/contract change.
+
 ## OPEN — must be decided with the user before implementing
 
 > Do **not** invent any of the following. Ask, then record here.

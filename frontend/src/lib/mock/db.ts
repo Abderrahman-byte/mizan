@@ -13,6 +13,7 @@ import type {
   SavingsGoal,
   Transaction,
 } from '@/types';
+import { isoDate } from '@/utils/date';
 
 /** A category plus its planned amount per mode. */
 export interface SeedCategory extends Category {
@@ -29,6 +30,92 @@ export interface MockDb {
   personHistory: Record<string, PersonEntry[]>;
   history: MonthHistory[];
   transactions: Transaction[];
+}
+
+// ── Historical transaction seeding ───────────────────────────────────────────
+// Past months store only monthly totals in `history`; the ledger needs viewable
+// line items. We synthesize a realistic per-month set whose `out` sum equals the
+// month's `spent` and whose `in` sum equals its `income`, so the recap (from
+// history) and the feed (these transactions) always agree.
+
+const MONTH_INDEX: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+/** Fixed monthly expenses — the same every month. */
+const FIXED_EXPENSES: { category: string; description: string; amount: number; day: number }[] = [
+  { category: 'Rent', description: 'Apartment rent', amount: 3200, day: 1 },
+  { category: 'Gym', description: 'Gym membership', amount: 250, day: 1 },
+  { category: 'Subscriptions', description: 'Netflix', amount: 75, day: 2 },
+  { category: 'Subscriptions', description: 'Spotify', amount: 60, day: 2 },
+  { category: 'Phone & net', description: 'Maroc Telecom', amount: 250, day: 5 },
+  { category: 'Utilities', description: 'LYDEC — water & power', amount: 360, day: 6 },
+];
+
+/** Variable expenses that absorb the rest of the month's spend, by weight. */
+const VARIABLE_EXPENSES: { category: string; description: string; weight: number; day: number }[] = [
+  { category: 'Groceries', description: 'Marjane', weight: 26, day: 3 },
+  { category: 'Family support', description: 'Support — Mom', weight: 14, day: 4 },
+  { category: 'Transport & gas', description: 'Shell station', weight: 9, day: 8 },
+  { category: 'Eating out', description: 'Dinner — Le Cabestan', weight: 9, day: 14 },
+  { category: 'Savings', description: 'To emergency fund', weight: 8, day: 1 },
+  { category: 'Dating', description: 'Cinema & dinner', weight: 7, day: 20 },
+  { category: 'Cigarettes', description: 'Tobacconist', weight: 6, day: 10 },
+  { category: 'Clothes', description: 'Clothes', weight: 6, day: 17 },
+  { category: 'Coffee', description: 'Café', weight: 5, day: 9 },
+];
+
+/**
+ * Synthesize line items for every month except the current one (the last entry
+ * in `history`, which keeps its hand-authored detail). Out-sum == `spent`,
+ * in-sum == `income`; the largest variable line absorbs rounding.
+ */
+function generateHistoryTransactions(history: MonthHistory[]): Transaction[] {
+  const fixedTotal = FIXED_EXPENSES.reduce((s, f) => s + f.amount, 0);
+  const weightTotal = VARIABLE_EXPENSES.reduce((s, v) => s + v.weight, 0);
+  const out: Transaction[] = [];
+  let id = 1000;
+
+  for (const h of history.slice(0, -1)) {
+    const year = 2000 + h.year;
+    const month = MONTH_INDEX[h.month];
+
+    out.push({
+      id: id++,
+      date: isoDate(year, month, 1),
+      description: `Salary — ${h.month}`,
+      category: 'Income',
+      amount: h.income,
+      direction: 'in',
+    });
+
+    for (const f of FIXED_EXPENSES) {
+      out.push({
+        id: id++,
+        date: isoDate(year, month, f.day),
+        description: f.description,
+        category: f.category,
+        amount: f.amount,
+        direction: 'out',
+      });
+    }
+
+    const remainder = h.spent - fixedTotal;
+    const amounts = VARIABLE_EXPENSES.map((v) => Math.round((remainder * v.weight) / weightTotal));
+    amounts[0] += remainder - amounts.reduce((s, a) => s + a, 0);
+    VARIABLE_EXPENSES.forEach((v, i) => {
+      out.push({
+        id: id++,
+        date: isoDate(year, month, v.day),
+        description: v.description,
+        category: v.category,
+        amount: amounts[i],
+        direction: 'out',
+      });
+    });
+  }
+  return out;
 }
 
 export const db: MockDb = {
@@ -113,44 +200,48 @@ export const db: MockDb = {
     { month: 'Jun', year: 26, mode: 2, spent: 11275, income: 11800, fund: 19850 },
   ],
 
-  // June 2026 transactions. direction 'out' = expense (counts toward spend/mode),
-  // 'in' = income. Per-category out sums equal each category's actual.
+  // Current-month (June 2026) transactions. direction 'out' = expense (counts
+  // toward spend/mode), 'in' = income. Per-category out sums equal each
+  // category's actual. Past months are synthesized below from `history`.
   transactions: [
-    { id: 1, day: 1, description: 'Salary — June', category: 'Income', amount: 9500, direction: 'in' },
-    { id: 2, day: 1, description: 'Apartment rent', category: 'Rent', amount: 3200, direction: 'out' },
-    { id: 3, day: 1, description: 'To emergency fund', category: 'Savings', amount: 1150, direction: 'out' },
-    { id: 4, day: 1, description: 'Gym membership', category: 'Gym', amount: 250, direction: 'out' },
-    { id: 5, day: 2, description: 'Support — Mom', category: 'Family support', amount: 1000, direction: 'out' },
-    { id: 6, day: 2, description: 'Netflix', category: 'Subscriptions', amount: 75, direction: 'out' },
-    { id: 7, day: 2, description: 'Spotify', category: 'Subscriptions', amount: 60, direction: 'out' },
-    { id: 8, day: 3, description: 'Marjane', category: 'Groceries', amount: 620, direction: 'out' },
-    { id: 9, day: 3, description: 'Tobacconist', category: 'Cigarettes', amount: 120, direction: 'out' },
-    { id: 10, day: 4, description: 'Shell station', category: 'Transport & gas', amount: 300, direction: 'out' },
-    { id: 11, day: 5, description: 'Maroc Telecom', category: 'Phone & net', amount: 250, direction: 'out' },
-    { id: 12, day: 5, description: 'Café Maure', category: 'Coffee', amount: 65, direction: 'out' },
-    { id: 13, day: 6, description: 'LYDEC — water & power', category: 'Utilities', amount: 360, direction: 'out' },
-    { id: 14, day: 7, description: 'Dinner — Le Cabestan', category: 'Eating out', amount: 280, direction: 'out' },
-    { id: 15, day: 8, description: 'Cinema & dinner', category: 'Dating', amount: 300, direction: 'out' },
-    { id: 16, day: 10, description: 'Carrefour', category: 'Groceries', amount: 480, direction: 'out' },
-    { id: 17, day: 11, description: 'Zara', category: 'Clothes', amount: 240, direction: 'out' },
-    { id: 18, day: 12, description: 'Starbucks', category: 'Coffee', amount: 70, direction: 'out' },
-    { id: 19, day: 13, description: 'Tobacconist', category: 'Cigarettes', amount: 120, direction: 'out' },
-    { id: 20, day: 14, description: 'Pizza night', category: 'Eating out', amount: 180, direction: 'out' },
-    { id: 21, day: 15, description: 'Freelance — design work', category: 'Income', amount: 2300, direction: 'in' },
-    { id: 22, day: 15, description: 'YouTube Premium', category: 'Subscriptions', amount: 40, direction: 'out' },
-    { id: 23, day: 16, description: 'Souk — fresh produce', category: 'Groceries', amount: 310, direction: 'out' },
-    { id: 24, day: 18, description: 'Shell station', category: 'Transport & gas', amount: 250, direction: 'out' },
-    { id: 25, day: 19, description: 'Café', category: 'Coffee', amount: 60, direction: 'out' },
-    { id: 26, day: 19, description: 'Gas bottle', category: 'Utilities', amount: 145, direction: 'out' },
-    { id: 27, day: 20, description: 'Gift', category: 'Dating', amount: 180, direction: 'out' },
-    { id: 28, day: 21, description: 'Dinner — friends', category: 'Eating out', amount: 260, direction: 'out' },
-    { id: 29, day: 22, description: 'Careem rides', category: 'Transport & gas', amount: 140, direction: 'out' },
-    { id: 30, day: 23, description: 'Tobacconist', category: 'Cigarettes', amount: 120, direction: 'out' },
-    { id: 31, day: 24, description: 'Marjane', category: 'Groceries', amount: 430, direction: 'out' },
-    { id: 32, day: 25, description: 'Shoes — Derby', category: 'Clothes', amount: 150, direction: 'out' },
-    { id: 33, day: 26, description: 'Café', category: 'Coffee', amount: 70, direction: 'out' },
+    { id: 1, date: '2026-06-01', description: 'Salary — June', category: 'Income', amount: 9500, direction: 'in' },
+    { id: 2, date: '2026-06-01', description: 'Apartment rent', category: 'Rent', amount: 3200, direction: 'out' },
+    { id: 3, date: '2026-06-01', description: 'To emergency fund', category: 'Savings', amount: 1150, direction: 'out' },
+    { id: 4, date: '2026-06-01', description: 'Gym membership', category: 'Gym', amount: 250, direction: 'out' },
+    { id: 5, date: '2026-06-02', description: 'Support — Mom', category: 'Family support', amount: 1000, direction: 'out' },
+    { id: 6, date: '2026-06-02', description: 'Netflix', category: 'Subscriptions', amount: 75, direction: 'out' },
+    { id: 7, date: '2026-06-02', description: 'Spotify', category: 'Subscriptions', amount: 60, direction: 'out' },
+    { id: 8, date: '2026-06-03', description: 'Marjane', category: 'Groceries', amount: 620, direction: 'out' },
+    { id: 9, date: '2026-06-03', description: 'Tobacconist', category: 'Cigarettes', amount: 120, direction: 'out' },
+    { id: 10, date: '2026-06-04', description: 'Shell station', category: 'Transport & gas', amount: 300, direction: 'out' },
+    { id: 11, date: '2026-06-05', description: 'Maroc Telecom', category: 'Phone & net', amount: 250, direction: 'out' },
+    { id: 12, date: '2026-06-05', description: 'Café Maure', category: 'Coffee', amount: 65, direction: 'out' },
+    { id: 13, date: '2026-06-06', description: 'LYDEC — water & power', category: 'Utilities', amount: 360, direction: 'out' },
+    { id: 14, date: '2026-06-07', description: 'Dinner — Le Cabestan', category: 'Eating out', amount: 280, direction: 'out' },
+    { id: 15, date: '2026-06-08', description: 'Cinema & dinner', category: 'Dating', amount: 300, direction: 'out' },
+    { id: 16, date: '2026-06-10', description: 'Carrefour', category: 'Groceries', amount: 480, direction: 'out' },
+    { id: 17, date: '2026-06-11', description: 'Zara', category: 'Clothes', amount: 240, direction: 'out' },
+    { id: 18, date: '2026-06-12', description: 'Starbucks', category: 'Coffee', amount: 70, direction: 'out' },
+    { id: 19, date: '2026-06-13', description: 'Tobacconist', category: 'Cigarettes', amount: 120, direction: 'out' },
+    { id: 20, date: '2026-06-14', description: 'Pizza night', category: 'Eating out', amount: 180, direction: 'out' },
+    { id: 21, date: '2026-06-15', description: 'Freelance — design work', category: 'Income', amount: 2300, direction: 'in' },
+    { id: 22, date: '2026-06-15', description: 'YouTube Premium', category: 'Subscriptions', amount: 40, direction: 'out' },
+    { id: 23, date: '2026-06-16', description: 'Souk — fresh produce', category: 'Groceries', amount: 310, direction: 'out' },
+    { id: 24, date: '2026-06-18', description: 'Shell station', category: 'Transport & gas', amount: 250, direction: 'out' },
+    { id: 25, date: '2026-06-19', description: 'Café', category: 'Coffee', amount: 60, direction: 'out' },
+    { id: 26, date: '2026-06-19', description: 'Gas bottle', category: 'Utilities', amount: 145, direction: 'out' },
+    { id: 27, date: '2026-06-20', description: 'Gift', category: 'Dating', amount: 180, direction: 'out' },
+    { id: 28, date: '2026-06-21', description: 'Dinner — friends', category: 'Eating out', amount: 260, direction: 'out' },
+    { id: 29, date: '2026-06-22', description: 'Careem rides', category: 'Transport & gas', amount: 140, direction: 'out' },
+    { id: 30, date: '2026-06-23', description: 'Tobacconist', category: 'Cigarettes', amount: 120, direction: 'out' },
+    { id: 31, date: '2026-06-24', description: 'Marjane', category: 'Groceries', amount: 430, direction: 'out' },
+    { id: 32, date: '2026-06-25', description: 'Shoes — Derby', category: 'Clothes', amount: 150, direction: 'out' },
+    { id: 33, date: '2026-06-26', description: 'Café', category: 'Coffee', amount: 70, direction: 'out' },
   ],
 };
+
+// Prepend synthesized history so every past month has a viewable, totals-consistent feed.
+db.transactions = [...generateHistoryTransactions(db.history), ...db.transactions];
 
 /** The current user (display only). */
 export const currentUser = { name: 'Yassine A.', firstName: 'Yassine', initials: 'YA' };
