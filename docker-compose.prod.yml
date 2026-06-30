@@ -1,0 +1,76 @@
+# Mizan — PRODUCTION stack (standalone; does NOT layer on the dev file).
+#
+#   DB_PASSWORD=... JWT_SECRET=... \
+#     docker compose -f docker-compose.prod.yml up -d --build
+#
+# Topology: the `frontend` nginx is the single published entry point (:80). It
+# serves the built SPA and proxies /api to the backend. `backend` and `db` are
+# reachable only inside the Docker network (no published host ports).
+#
+# TLS is terminated externally (cloud LB / ingress) in front of :80.
+#
+# Required secrets (NO insecure defaults in prod): DB_PASSWORD, JWT_SECRET.
+# Provide them via the environment or the root ./.env. The stack refuses to start
+# if they are unset.
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - mizan-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      JWT_SECRET: ${JWT_SECRET}
+      # Token TTLs are not here — they're app constants in app/core/config.py.
+    depends_on:
+      db:
+        condition: service_healthy
+    # Apply migrations, then run the server (no --reload; multiple workers).
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health').status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        # Single-origin: relative path, proxied to the backend by nginx.
+        VITE_API_URL: /api
+    restart: unless-stopped
+    # The only published port. TLS is handled upstream.
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mizan-db-data:
