@@ -30,6 +30,14 @@ isn't decided — and Claude Code must ask before assuming it.
   `DB_PASSWORD`, `DB_NAME` (the async SQLAlchemy URL is assembled in `core/config.py`) — plus
   `LOG_LEVEL` and `JWT_SECRET`. Token TTLs are **app constants** in `core/config.py`
   (`ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_DAYS`), not env vars. See `setup.md`.
+- **CORS (2026-06-30):** `CORSMiddleware` added in `main.py` (outermost, so preflight is answered
+  and headers reach error responses too). Allowed origins come from a new env-configurable
+  `CORS_ORIGINS` (comma-separated, parsed by a `field_validator` in `core/config.py`), defaulting
+  to the Vite dev origins `http://localhost:5173,http://localhost:5174`. `allow_credentials=False`
+  since auth uses Bearer tokens in the `Authorization` header, not cookies (this also lets
+  `allow_headers="*"` cover `Authorization`). Cross-origin only matters in local dev; prod is
+  same-origin behind nginx. No new dependency (`CORSMiddleware` ships with FastAPI/Starlette). See
+  `setup.md`.
 - **Backend skeleton (2026-06-29):** the app skeleton is implemented (no feature modules/
   endpoints). `core/`: `config`, `responses` (Success/Error envelopes), `exceptions`
   (`APIException`), `error_handlers` (4 ordered handlers + the

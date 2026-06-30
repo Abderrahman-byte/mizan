@@ -31,7 +31,14 @@ DB_PASSWORD=mizan
 DB_NAME=mizan
 LOG_LEVEL=INFO
 JWT_SECRET=change-me                     # placeholder; required (no default) in prod
+CORS_ORIGINS=http://localhost:5173,http://localhost:5174  # browser origins allowed to call the API (comma-separated)
 ```
+
+`CORS_ORIGINS` is a comma-separated list (parsed in `core/config.py`); it defaults to the Vite
+dev origins (`:5173`, `:5174`). It only matters **cross-origin** in local dev (SPA → API on a
+different port); in prod the SPA is served same-origin behind nginx, so CORS is a no-op there.
+The API uses Bearer tokens in the `Authorization` header (not cookies), so the middleware runs
+with `allow_credentials=False`.
 
 Token TTLs are **not** env vars — they are app constants in `app/core/config.py`
 (`ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_DAYS`), per the convention that intervals/TTLs
