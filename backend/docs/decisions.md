@@ -46,24 +46,115 @@ isn't decided — and Claude Code must ask before assuming it.
   migration revisions exist yet (schema undecided), so it is currently a no-op. See `setup.md`.
 - **Auth mechanism (2026-06-29, build deferred):** JWT **Bearer** tokens (frontend stores in
   localStorage + Axios interceptor); **access** (~15 min) + **refresh** (~30 d) tokens with a
-  refresh endpoint; passwords hashed with **bcrypt via `pwdlib`**. Endpoint surface, signup
-  fields, reset-token storage, and email delivery remain OPEN below.
+  refresh endpoint; passwords hashed with **bcrypt via `pwdlib`**. Endpoint surface, reset-token
+  storage, and email delivery remain OPEN below.
+- **Refresh-token strategy (2026-06-30, build deferred):** **DB-backed refresh sessions with
+  rotation** — a `refresh_tokens` table stores a hashed token per session; refresh rotates it and
+  logout revokes it (enables true server-side logout/revocation). Table shape and the rotation
+  flow are built with the auth endpoints, not yet. See `docs/auth.md`.
+- **JWT codec library (2026-06-30):** **PyJWT** (lightweight, JWT-focused). To be added to
+  `requirements.txt` when token-encoding code lands. `pwdlib[bcrypt]` likewise pending the
+  hashing code. See `docs/auth.md`.
+- **Router location (2026-06-30):** **all routers live under `app/api/`** (route handlers at
+  `app/api/v1/<resource>.py`), never inside `app/modules/<feature>/`. Feature modules hold only
+  the non-routing layers (`models`, `schemas`, `repository`, `service`, `engine?`, `enums`,
+  `exceptions`). This matches the directory layout in `conventions.md` / `architecture.md`.
+- **Auth endpoint set (2026-06-30, stubbed):** six endpoints under `/api/v1/auth` —
+  `POST register`, `POST login`, `POST refresh`, `POST logout`, `POST forgot-password`,
+  `POST reset-password` — scaffolded in `app/api/v1/auth.py` and mounted in `api/v1/router.py`.
+  All handlers are **stubs returning `501 NOT_IMPLEMENTED`**; their payloads, response shapes, and
+  logic stay OPEN. `NOT_IMPLEMENTED` is a temporary stub code, not a catalogue entry. See
+  `docs/auth.md`.
+- **`GET /api/v1/auth/me` contract (2026-06-30, implemented):** a 7th auth route (added on
+  request) returning the authenticated user's profile. Requires `Authorization: Bearer
+  <access-token>`, no body; success **200** with the user fields **directly under `data`** (no
+  wrapper) reusing `UserResponse`. No service layer — the auth dependency resolves the principal
+  and the router maps ORM→schema. See `docs/auth.md`.
+- **Bearer-token auth dependency (2026-06-30, implemented):** `get_current_user` in
+  `app/api/deps.py` (exposed as `CurrentUser`) is the **shared** guard for every protected route.
+  Extracts the token via `HTTPBearer(auto_error=False)`, validates it with
+  `security.decode_access_token` (HS256 sig + `exp` + `type=="access"`, returns `sub`), then loads
+  the user. **PyJWT stays encapsulated in `core/security.py`**, which raises codec-neutral
+  `AccessTokenExpired` / `AccessTokenInvalid`; the dependency maps these to **401
+  `AUTH_TOKEN_EXPIRED`** (expired — client refreshes) and **401 `AUTH_TOKEN_INVALID`**
+  (missing/malformed/badly-signed/wrong-type, or vanished user — client re-logs-in). See
+  `docs/auth.md`.
+- **`users` table (2026-06-30):** the `User` entity has columns `id`, `created_at`, `updated_at`
+  (mixin) + `email` `String(320)` **unique**, `display_name` `String(100)`, `password_hash`
+  `String(255)` — all NOT NULL. First migration `2570e00d751f` (`create users table`) created and
+  verified (upgrade/downgrade roundtrip, `alembic check` clean). Email case-handling and the
+  signup payload are decided with the auth services. See `docs/auth.md` and `docs/schema.md`.
+- **Auth/users module consolidation (2026-06-30):** the `users` module was **merged into `auth`**
+  — there is no separate `users` module. The `auth` module (`app/modules/auth/`) owns **both** the
+  `User` identity entity and the `RefreshToken` session entity (both in `models.py`), plus all auth
+  flow layers (schemas/repository/service/exceptions). Table names (`users`, `refresh_tokens`) are
+  unchanged, so no migration is affected. Routes stay in `app/api/v1/auth.py`. Supersedes the
+  earlier "separate `users` module" note.
+- **`refresh_tokens` table (2026-06-30):** owned by the new `auth` module
+  (`app/modules/auth/models.py`). Columns: `id`/`created_at`/`updated_at` (mixin) + `user_id`
+  `BigInteger` FK→`users.id` (`ondelete=CASCADE`, indexed), `token_hash` `String(64)` **unique**
+  NOT NULL, `expires_at` `TIMESTAMPTZ` NOT NULL, `revoked_at` `TIMESTAMPTZ` nullable. Migration
+  `9f3c1a2b4d5e` (`create refresh_tokens table`). One row = one refresh session. See `docs/schema.md`.
+- **Refresh-token format & hashing (2026-06-30):** the refresh token handed to the client is
+  **`"<row_id>.<secret>"`**, where `secret` is a high-entropy opaque string
+  (`secrets.token_urlsafe(32)`); only the **bcrypt hash of `secret`** (via `pwdlib`) is stored in
+  `token_hash`. Because bcrypt salts every hash a stored hash is **not look-up-able** by value, so
+  the `row_id` prefix makes the session directly addressable: `/refresh` and `/logout`
+  `parse_refresh_token` the value, load that one row by PK, and `verify` the secret (O(1), no
+  candidate scan). Helpers in `app/core/security.py`. See `docs/auth.md`.
+- **Access-token format (2026-06-30):** **HS256 JWT** signed with `JWT_SECRET`, claims
+  `sub`=str(user_id), `iat`, `exp` (now + `ACCESS_TOKEN_TTL_MINUTES`), `type="access"`. Codec
+  `PyJWT`; password/refresh hashing `pwdlib[bcrypt]` — both now added to `requirements.txt`.
+  Implemented in `app/core/security.py`. See `docs/auth.md`.
+- **`POST /api/v1/auth/register` contract (2026-06-30, implemented):** request
+  `{email, displayName, password}`; email normalized (trim + lowercase); `displayName` 1–100
+  chars (trimmed); password 8–128 chars, no complexity rule. On success returns **201** with
+  `{data: {user: {id, email, displayName, createdAt}, accessToken, refreshToken}}` (auto-login:
+  creates a `refresh_tokens` session). Duplicate email → **409 `EMAIL_TAKEN`** (pre-checked, with
+  the DB unique constraint as a race backstop). Built end-to-end (router → service → repository →
+  models) per the layering rule. See `docs/auth.md`.
+- **`POST /api/v1/auth/login` contract (2026-06-30, implemented):** request `{email, password}`;
+  email normalized (trim + lowercase) to match the stored identity, **no** format/length
+  validation on the login path. On success returns **200** with the **same body as register**
+  (`{data: {user, accessToken, refreshToken}}`), opening a new `refresh_tokens` session. An
+  unknown email and a wrong password both return **401 `INVALID_CREDENTIALS`** (single generic
+  message — no account enumeration; verified via `security.verify_password`). Built router →
+  service (`login`, sharing the `_open_session` token helper with `register`) → repository. See
+  `docs/auth.md`.
+- **`POST /api/v1/auth/refresh` contract (2026-06-30, implemented):** request `{refreshToken}`
+  (the `"<id>.<secret>"` value); no access token. The server loads session row `id` by PK and
+  verifies `secret`. On success returns **200** with the **rotated pair only**
+  `{data: {accessToken, refreshToken}}` — the presented session is revoked (`revoked_at`) and a
+  fresh one issued, so a replayed token is rejected. Errors: **401 `REFRESH_TOKEN_INVALID`**
+  (malformed / unknown / mismatched / already-revoked) and **401 `REFRESH_TOKEN_EXPIRED`** (past
+  `expires_at`); client re-logs-in on either. Built router → `service.refresh`
+  (`_resolve_refresh_session` + `_open_session`) → repository. See `docs/auth.md`.
+- **`POST /api/v1/auth/logout` contract (2026-06-30, implemented):** request `{refreshToken}`; no
+  access token. Revokes **just that one session** (`revoked_at`); returns **204 No Content**. Same
+  error resolution as refresh (`REFRESH_TOKEN_INVALID` / `REFRESH_TOKEN_EXPIRED`). Built router →
+  `service.logout` (shares `_resolve_refresh_session`) → repository. See `docs/auth.md`.
 
 ## OPEN — must be decided with the user before implementing
 
 > Do **not** invent any of the following. Ask, then record the answer here.
 
 ### Database schema
-- All tables, columns, types, and relationships. **Nothing about the schema is decided.**
+- The `users` and `refresh_tokens` tables are **decided** (see Confirmed above; `docs/schema.md`).
+  All other tables, columns, types, and relationships are still undecided.
 
 ### API endpoints
-- All routes, path/query params, request payloads, and response shapes. **No endpoint is
-  decided.**
+- The **auth endpoint set** (7 routes under `/api/v1/auth`, incl. `GET me`) is decided;
+  **`register`, `login`, `me`, `refresh`, and `logout` are fully implemented** (contracts in
+  Confirmed above; the shared Bearer-token auth dependency is built). Only **`forgot-password` /
+  `reset-password`** remain undecided (payload, response shape, success status, error codes). All
+  non-auth routes remain entirely undecided.
 
 ### Auth (remaining open items)
-- Mechanism/token strategy are **decided** (see Confirmed above). Still open: the endpoint
-  surface (register/login/refresh/logout/me/forgot/reset), signup field set, `users` table
-  columns, reset-token storage (table vs. signed token), and password-reset email delivery.
+- Mechanism, token strategy/format, refresh strategy, JWT lib, the `users`/`refresh_tokens`
+  columns, the endpoint **set**, the **`register`/`login`/`me`/`refresh`/`logout` contracts**, and
+  the **shared Bearer-token auth dependency** are **decided** (see Confirmed above). Still open: the
+  `forgot-password` / `reset-password` request/response contracts, reset-token storage (table vs.
+  signed token), and password-reset email delivery.
 
 ### Domain rules
 - How a month is classified into a spending mode (formula/thresholds).

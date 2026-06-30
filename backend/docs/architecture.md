@@ -60,7 +60,8 @@ scaffolded speculatively.
 1. User confirms the feature, its data shape, and its endpoints → record in `decisions.md`.
 2. `models.py` → migration (with `downgrade()`).
 3. `repository.py` (queries) → `service.py` (logic) → `engine.py` (pure logic, if any).
-4. `schemas.py` (separate request/response) → `router.py` (wiring only).
+4. `schemas.py` (separate request/response) → `api/v1/<resource>.py` (router, wiring only —
+   routers live under `app/api/`, not in the module).
 5. Register the router; add any module exceptions/enums.
 
 Never start at the router with logic inline; never skip the repository to query from a service.

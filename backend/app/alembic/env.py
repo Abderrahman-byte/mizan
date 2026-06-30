@@ -17,8 +17,8 @@ from alembic import context
 from app.core.config import settings
 from app.db.base import Base
 
-# When models are added, import them here so they register on Base.metadata, e.g.:
-#   from app.modules.<feature> import models  # noqa: F401
+# Import feature models here so they register on Base.metadata before --autogenerate runs.
+from app.modules.auth import models as auth_models  # noqa: F401
 
 config = context.config
 

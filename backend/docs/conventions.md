@@ -73,9 +73,12 @@ app/
 | `schemas.py` | Pydantic request/response models | ORM models, DB queries |
 | `repository.py` | DB query functions (async) | Business logic, HTTP calls |
 | `service.py` | Business logic (calls repository) | Direct DB session, route handling |
-| `router.py` | Routes, DI, schema mapping | Business logic, DB queries |
+| `api/v1/<resource>.py` | Routes, DI, schema mapping | Business logic, DB queries |
 | `enums.py` | Python `Enum` classes | Anything else |
 | `exceptions.py` | Module-specific exceptions | Exception handlers |
+
+> **Router location:** route handlers live under `app/api/` (`api/v1/<resource>.py`), **never**
+> inside `app/modules/<feature>/`. A feature module holds only the non-routing layers above.
 
 ### Config rules
 

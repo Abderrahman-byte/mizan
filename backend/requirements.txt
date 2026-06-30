@@ -8,3 +8,6 @@ alembic>=1.13
 pydantic>=2.7
 pydantic-settings>=2.3
 loguru>=0.7
+# Auth: bcrypt password/refresh-token hashing + JWT access tokens (decided in docs/auth.md).
+pwdlib[bcrypt]>=0.2
+PyJWT>=2.8

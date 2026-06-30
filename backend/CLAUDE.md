@@ -32,6 +32,10 @@ Read the doc relevant to your task. These hold the *how*; this file is just the 
   the app.
 - **`docs/decisions.md`** — running log of confirmed decisions. **Schema and endpoints will be
   recorded here once the user decides them — until then they are open.**
+- **`docs/schema.md`** — confirmed database tables (currently: `users`). Tables appear here only
+  after the user confirms them.
+- **`docs/auth.md`** — authentication: confirmed mechanism/token/refresh/identity decisions, what
+  is still open, and per-piece build status.
 
 ## The layering rule (non-negotiable)
 
