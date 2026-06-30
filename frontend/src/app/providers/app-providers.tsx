@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AuthProvider } from '@/features/auth';
 import { BudgetProvider } from '@/features/budget';
 import { TransactionsProvider } from '@/features/transactions';
 import { PeopleProvider } from '@/features/people';
@@ -14,15 +15,17 @@ import { ThemeProvider } from './theme-provider';
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <BudgetProvider>
-        <TransactionsProvider>
-          <SavingsProvider>
-            <PeopleProvider>
-              <HistoryProvider>{children}</HistoryProvider>
-            </PeopleProvider>
-          </SavingsProvider>
-        </TransactionsProvider>
-      </BudgetProvider>
+      <AuthProvider>
+        <BudgetProvider>
+          <TransactionsProvider>
+            <SavingsProvider>
+              <PeopleProvider>
+                <HistoryProvider>{children}</HistoryProvider>
+              </PeopleProvider>
+            </SavingsProvider>
+          </TransactionsProvider>
+        </BudgetProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

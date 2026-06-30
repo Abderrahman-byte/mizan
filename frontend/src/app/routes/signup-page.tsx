@@ -1,13 +1,26 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AuthLayout, SignUpForm } from '@/features/auth';
+import { AuthLayout, SignUpForm, authErrorMessage, useAuth } from '@/features/auth';
+import type { SignUpValues } from '@/features/auth';
 
 export function SignUpPage() {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // TODO: confirm before implementing — wire real authentication (create the
-  // account via the API, store the token, set the Axios interceptor). For now
-  // this is a front-end shell: a valid submit drops straight into the app.
-  const handleSignUp = () => navigate('/');
+  const handleSignUp = async (values: SignUpValues) => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      // The form collects `name`; the API expects `displayName`.
+      await signUp({ email: values.email, displayName: values.name, password: values.password });
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(authErrorMessage(err));
+      setSubmitting(false);
+    }
+  };
 
   return (
     <AuthLayout
@@ -22,7 +35,7 @@ export function SignUpPage() {
         </>
       }
     >
-      <SignUpForm onSubmit={handleSignUp} />
+      <SignUpForm onSubmit={handleSignUp} submitting={submitting} error={error} />
     </AuthLayout>
   );
 }

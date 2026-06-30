@@ -88,6 +88,10 @@ feature folders.
   `features/people`, Settings → `features/settings`, auth → `features/auth` (each exposes
   presentational components). Dashboard and Summary are composite, so they live in
   `src/app/routes/` and pull from multiple feature hooks.
+- **Auth guards:** `RequireAuth` (wraps the `AppLayout` subtree → redirects to `/signin`) and
+  `RedirectIfAuthenticated` (wraps `/signin` / `/signup`) live in `src/app/routes/auth-guards.tsx`
+  and read the session via `features/auth`'s `useAuth()`. The `AuthProvider` is composed in
+  `src/app/providers/app-providers.tsx` above the router. See `docs/auth-client.md`.
 
 ## Mock data layer (no API yet)
 

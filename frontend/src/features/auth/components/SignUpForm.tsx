@@ -12,7 +12,13 @@ export interface SignUpValues {
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 const MIN_PASSWORD = 8;
 
-export function SignUpForm({ onSubmit }: { onSubmit: (values: SignUpValues) => void }) {
+export interface SignUpFormProps {
+  onSubmit: (values: SignUpValues) => void;
+  submitting?: boolean;
+  error?: string | null;
+}
+
+export function SignUpForm({ onSubmit, submitting = false, error }: SignUpFormProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +32,7 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: SignUpValues) => v
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valid) return;
+    if (!valid || submitting) return;
     onSubmit({ name: name.trim(), email, password });
   };
 
@@ -90,12 +96,18 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: SignUpValues) => v
         </span>
       </label>
 
+      {error && (
+        <p className="mt-4 rounded-[var(--radius)] border-[1.5px] border-line bg-surface-2 px-3 py-2 text-[13px] font-semibold text-warn">
+          {error}
+        </p>
+      )}
+
       <Button
         type="submit"
-        disabled={!valid}
+        disabled={!valid || submitting}
         className="mt-5 w-full disabled:pointer-events-none disabled:opacity-50"
       >
-        Create account
+        {submitting ? 'Creating account…' : 'Create account'}
       </Button>
     </form>
   );

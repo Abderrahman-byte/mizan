@@ -13,18 +13,19 @@ export interface SettingsScreenProps {
   profile: SettingsProfile;
   savings: SavingsGoal;
   onSaveSavings: (patch: { label: string; goal: number }) => void;
+  onSignOut: () => void;
 }
 
-export function SettingsScreen({ profile, savings, onSaveSavings }: SettingsScreenProps) {
+export function SettingsScreen({ profile, savings, onSaveSavings, onSignOut }: SettingsScreenProps) {
   return (
     <div className="flex flex-col gap-3.5 lg:max-w-[640px]">
-      <ProfileCard profile={profile} />
+      <ProfileCard profile={profile} onSignOut={onSignOut} />
       <SavingsCard savings={savings} onSave={onSaveSavings} />
     </div>
   );
 }
 
-function ProfileCard({ profile }: { profile: SettingsProfile }) {
+function ProfileCard({ profile, onSignOut }: { profile: SettingsProfile; onSignOut: () => void }) {
   return (
     <Card className="flex flex-col gap-4">
       <CardHeading>Profile</CardHeading>
@@ -38,10 +39,12 @@ function ProfileCard({ profile }: { profile: SettingsProfile }) {
       <div className="flex items-start gap-2 rounded-[var(--radius)] border-[1.5px] border-line bg-surface-2 p-3 text-[13px] text-ink-soft">
         <Icon name="user" size={16} className="mt-0.5 flex-none" />
         <span>
-          Editing your name, email, and password — plus sign-out — arrives with{' '}
-          <b className="text-ink">accounts</b>, which aren't set up yet.
+          Editing your name, email, and password is coming soon.
         </span>
       </div>
+      <Button variant="ghost" onClick={onSignOut} className="w-full">
+        <Icon name="arrowOut" size={17} className="mr-1.5" /> Sign out
+      </Button>
     </Card>
   );
 }

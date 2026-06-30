@@ -10,15 +10,34 @@ import { SignInPage } from './signin-page';
 import { SignUpPage } from './signup-page';
 import { ForgotPasswordPage } from './forgot-password-page';
 import { ResetPasswordPage } from './reset-password-page';
+import { RedirectIfAuthenticated, RequireAuth } from './auth-guards';
 
 export const router = createBrowserRouter([
-  { path: '/signin', element: <SignInPage /> },
-  { path: '/signup', element: <SignUpPage /> },
+  {
+    path: '/signin',
+    element: (
+      <RedirectIfAuthenticated>
+        <SignInPage />
+      </RedirectIfAuthenticated>
+    ),
+  },
+  {
+    path: '/signup',
+    element: (
+      <RedirectIfAuthenticated>
+        <SignUpPage />
+      </RedirectIfAuthenticated>
+    ),
+  },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <RequireAuth>
+        <AppLayout />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'summary', element: <SummaryPage /> },

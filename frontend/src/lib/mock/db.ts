@@ -242,11 +242,3 @@ export const db: MockDb = {
 
 // Prepend synthesized history so every past month has a viewable, totals-consistent feed.
 db.transactions = [...generateHistoryTransactions(db.history), ...db.transactions];
-
-/** The current user (display only). */
-export const currentUser = {
-  name: 'Yassine A.',
-  firstName: 'Yassine',
-  initials: 'YA',
-  email: 'yassine.alami@gmail.com',
-};

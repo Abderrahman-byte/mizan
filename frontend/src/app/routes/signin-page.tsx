@@ -1,13 +1,29 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { AuthLayout, SignInForm } from '@/features/auth';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AuthLayout, SignInForm, authErrorMessage, useAuth } from '@/features/auth';
+import type { SignInValues } from '@/features/auth';
 
 export function SignInPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // TODO: confirm before implementing — wire real authentication (call the API,
-  // store the token, set the Axios interceptor). For now this is a front-end
-  // shell: a valid submit drops straight into the app.
-  const handleSignIn = () => navigate('/');
+  // Where to land after sign-in: the page the guard bounced us from, or the dashboard.
+  const from = (location.state as { from?: string } | null)?.from ?? '/';
+
+  const handleSignIn = async (values: SignInValues) => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await signIn(values);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(authErrorMessage(err));
+      setSubmitting(false);
+    }
+  };
 
   return (
     <AuthLayout
@@ -22,7 +38,7 @@ export function SignInPage() {
         </>
       }
     >
-      <SignInForm onSubmit={handleSignIn} />
+      <SignInForm onSubmit={handleSignIn} submitting={submitting} error={error} />
     </AuthLayout>
   );
 }

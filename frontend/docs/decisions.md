@@ -103,6 +103,44 @@ ask before assuming.
   (→ sign in). **Shell only** — token isn't validated and no real reset endpoint is called
   (`// TODO: confirm` in `reset-password-page.tsx`). Real reset behavior remains OPEN.
 
+- **Auth API functions (2026-06-30):** `features/auth` gained a **real** (non-mock) `api/auth-api.ts`
+  built against the now-confirmed backend auth contract (`backend/docs/auth.md`): `register`,
+  `login`, `getCurrentUser` (`GET /v1/auth/me`), `refresh`, and `logout`, with request/response
+  types in `features/auth/types/auth.ts` (`AuthUser`, `RegisterRequest`, `LoginRequest`,
+  `TokenPair`, `AuthSession`). These call the configured Axios client directly (the auth contract
+  is decided + implemented, so they don't use the mock layer the rest of the app runs on). All
+  exported from the feature's `index.ts`. **Plumbing only — not wired into the UI**: no token
+  storage, no auth request interceptor, and no route guards yet (those stay OPEN below). `forgot-`
+  /`reset-password` have no client function (backend stubs return 501).
+
+- **Auth client plumbing (2026-06-30):** activated `lib/api-client.ts` (previously dormant) with
+  token storage + transparent refresh. New `lib/auth-tokens.ts` is the single read/write point for
+  the access + refresh tokens in **`localStorage`** (`mizan.accessToken` / `mizan.refreshToken`),
+  per `backend/docs/auth.md`; it lives in `lib/` (not `features/auth`) because the shared client
+  reads tokens and shared layers can't import features. The client now (a) attaches
+  `Authorization: Bearer` via a request interceptor, (b) unwraps `{ data }`, and (c) on a
+  `401 AUTH_TOKEN_EXPIRED` does a **single-flight** `POST /v1/auth/refresh` (bare axios, no
+  interceptor recursion), stores the rotated pair, and replays the request **once** (`_retry`
+  guard); a failed refresh `clearTokens()` and rejects. **Not** done here (still open): redirect on
+  dead session, `AUTH_TOKEN_INVALID` UI handling, and persisting tokens on login/register. See the
+  new `docs/auth-client.md`.
+
+- **Auth UI integration + route guard (2026-06-30):** wired the auth API into the app. New
+  **auth store** (`features/auth/stores/auth-store.tsx`, `AuthProvider` + `useAuth()`) is the
+  session source of truth — `signIn`/`signUp` (persist tokens via `setTokens`, throw normalized
+  errors), `signOut` (clear locally + best-effort server `logout`), and a **bootstrap** that
+  hydrates from a stored token via `GET /auth/me` (synchronous `unauthenticated` when no token, so
+  no splash flash). `AuthProvider` mounts in `app/providers` above the router. New **route guards**
+  (`app/routes/auth-guards.tsx`): `RequireAuth` gates the `AppLayout` subtree (→ `/signin`,
+  remembering `from`), `RedirectIfAuthenticated` keeps signed-in users off `/signin`/`/signup`. The
+  `SignInForm`/`SignUpForm` gained `submitting`/`error` props (button busy text + inline error
+  banner); their pages call the store and surface `authErrorMessage(code)` (INVALID_CREDENTIALS /
+  EMAIL_TAKEN / VALIDATION_ERROR). **Sign-out** added to the Sidebar (desktop) and the Settings
+  profile card (mobile, where the sidebar is hidden). The mock `currentUser` (db.ts) was **removed**;
+  Sidebar / Dashboard / Settings now read `useAuth().user` (initials via the shared `initials()`,
+  first name via `firstNameOf`). `forgot`/`reset-password` stay **UI shells** (backend 501 stubs).
+  See `docs/auth-client.md`.
+
 ## OPEN — must be decided with the user before implementing
 
 > Do **not** invent any of the following. Ask, then record here.
@@ -114,11 +152,12 @@ ask before assuming.
   lands (see `mock-data.md` for the swap recipe). Build real types from the confirmed contract.
 
 ### Auth
-- The `/signin` and `/signup` **UI shells** exist (see Confirmed above), but the **behavior** is
-  open: the real sign-up/login API calls, token storage, the request-auth interceptor, and route
-  guards (redirecting unauthenticated users to `/signin` and back). Not yet built; the Axios
-  client has a placeholder for it. Resolve the `// TODO: confirm` markers in `signin-page.tsx` /
-  `signup-page.tsx` when this lands.
+- Sign-up / sign-in / sign-out, the session store, route guards, and transparent refresh are all
+  **built** (confirmed 2026-06-30, see above). What remains open:
+  - **Password reset** end-to-end — the backend `forgot-password` / `reset-password` endpoints are
+    **501 stubs** (contract undecided), so `/forgot-password` and `/reset-password` stay UI shells
+    with `// TODO: confirm` markers. Resolve once the backend designs those contracts.
+  - **Profile editing** (change name / email / password) from the Settings screen — deferred.
 
 ---
 

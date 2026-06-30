@@ -10,7 +10,13 @@ export interface SignInValues {
 
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
-export function SignInForm({ onSubmit }: { onSubmit: (values: SignInValues) => void }) {
+export interface SignInFormProps {
+  onSubmit: (values: SignInValues) => void;
+  submitting?: boolean;
+  error?: string | null;
+}
+
+export function SignInForm({ onSubmit, submitting = false, error }: SignInFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -18,7 +24,7 @@ export function SignInForm({ onSubmit }: { onSubmit: (values: SignInValues) => v
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valid) return;
+    if (!valid || submitting) return;
     onSubmit({ email, password });
   };
 
@@ -49,12 +55,18 @@ export function SignInForm({ onSubmit }: { onSubmit: (values: SignInValues) => v
         </Link>
       </div>
 
+      {error && (
+        <p className="mt-4 rounded-[var(--radius)] border-[1.5px] border-line bg-surface-2 px-3 py-2 text-[13px] font-semibold text-warn">
+          {error}
+        </p>
+      )}
+
       <Button
         type="submit"
-        disabled={!valid}
+        disabled={!valid || submitting}
         className="mt-4 w-full disabled:pointer-events-none disabled:opacity-50"
       >
-        Sign in
+        {submitting ? 'Signing in…' : 'Sign in'}
       </Button>
     </form>
   );

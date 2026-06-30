@@ -31,7 +31,9 @@ without asking first.
 - **`docs/design-system.md`** — the **Bloom** design system: tokens, the internal component
   library inventory, spending-mode labels/colors, dark mode, responsive nav.
 - **`docs/mock-data.md`** — the typed in-memory mock layer and the exact swap-to-Axios recipe
-  (no API integration yet).
+  (no API integration yet — except auth, which is live).
+- **`docs/auth-client.md`** — the live auth plumbing: token storage (`localStorage`), the Axios
+  request/response interceptors, and transparent token refresh on `AUTH_TOKEN_EXPIRED`.
 - **`docs/setup.md`** — local dev, Docker, environment variables, scripts.
 - **`docs/decisions.md`** — running log of confirmed frontend decisions. Anything not here is
   open — ask.
@@ -63,9 +65,12 @@ per-feature React Context stores (no extra library); the **Bloom** design system
 component library (`src/components`); the five screens (Dashboard, Summary, Ledger, Budget Modes,
 People); and the typed mock-data layer (no API yet). See `docs/decisions.md`.
 
-**Open (ask before acting):** the **API contract** (owned by backend, undecided — the app runs on
-the mock layer; reconcile `src/types` + feature `api/` with the confirmed contract per
-`docs/mock-data.md`); **auth** (sign-up/login, token storage, request interceptor — not built).
+**Open (ask before acting):** the **API contract** for the domain features (owned by backend,
+undecided — those features run on the mock layer; reconcile `src/types` + feature `api/` with the
+confirmed contract per `docs/mock-data.md`). **Auth is built** — sign-up/in/out, the `useAuth`
+session store, route guards, and transparent token refresh against the confirmed contract (see
+`docs/auth-client.md`); only **password reset** (backend 501 stubs) and **profile editing** remain
+open there.
 
 ## Before you start a frontend task
 

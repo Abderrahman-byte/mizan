@@ -7,6 +7,10 @@ change. This is a deliberate, confirmed decision (see `decisions.md`).
 > The backend API contract is **not finalized**. The domain types and `api/` signatures here are
 > our *expected* shape; reconcile them with the confirmed backend contract when it lands.
 
+> **Exception — auth.** The auth contract *is* confirmed and implemented (`backend/docs/auth.md`),
+> so `features/auth/api/auth-api.ts` calls the real backend through the Axios client and does **not**
+> use this mock layer. Everything below applies to the still-open domain features only.
+
 ## Pieces
 
 - **`src/types/`** — framework-agnostic domain models (`Category`, `Transaction`, `Person`,

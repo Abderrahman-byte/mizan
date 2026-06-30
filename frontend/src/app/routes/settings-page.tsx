@@ -1,10 +1,12 @@
+import { initials } from '@/components';
+import { useAuth } from '@/features/auth';
 import { useSavings } from '@/features/savings';
 import { SettingsScreen } from '@/features/settings';
-import { currentUser } from '@/lib/mock/db';
 import { PageContainer, PageHeader } from '../layout';
 import { PageError, PageLoading } from './page-status';
 
 export function SettingsPage() {
+  const { user, signOut } = useAuth();
   const { savings, update, loading, error } = useSavings();
 
   const header = (
@@ -15,7 +17,7 @@ export function SettingsPage() {
     />
   );
 
-  if (loading || error || !savings) {
+  if (loading || error || !savings || !user) {
     return (
       <>
         {header}
@@ -30,12 +32,13 @@ export function SettingsPage() {
       <PageContainer>
         <SettingsScreen
           profile={{
-            name: currentUser.name,
-            email: currentUser.email,
-            initials: currentUser.initials,
+            name: user.displayName,
+            email: user.email,
+            initials: initials(user.displayName),
           }}
           savings={savings}
           onSaveSavings={update}
+          onSignOut={signOut}
         />
       </PageContainer>
     </>

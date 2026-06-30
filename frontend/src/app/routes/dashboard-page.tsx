@@ -15,12 +15,13 @@ import { useSavings } from '@/features/savings';
 import { useHistory } from '@/features/history';
 import type { MonthHistory, SavingsGoal } from '@/types';
 import { formatDH } from '@/utils/format';
-import { currentUser } from '@/lib/mock/db';
+import { firstNameOf, useAuth } from '@/features/auth';
 import { PageContainer, PageHeader } from '../layout';
 import { useMonthMode } from '../hooks/use-month-mode';
 import { PageError, PageLoading } from './page-status';
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const { mode, totals, totalActual, monthlyIncome } = useMonthMode();
   const { actuals, loading: txLoading, error: txError } = useTransactions();
   const { savings, loading: savingsLoading, error: savingsError } = useSavings();
@@ -31,7 +32,7 @@ export function DashboardPage() {
 
   const header = (
     <PageHeader
-      title={`Hi, ${currentUser.firstName}`}
+      title={user ? `Hi, ${firstNameOf(user)}` : 'Hi'}
       mobileTitle="June"
       subtitle="Here's how June is shaping up."
       action={
