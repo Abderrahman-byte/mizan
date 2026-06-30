@@ -46,7 +46,7 @@ app/
 │   ├── context.py           # Request-identity envelope + dependency
 │   ├── permissions.py       # Role guards
 │   ├── error_handlers.py    # Centralized exception handlers
-│   ├── exceptions.py        # Base APIException + ExternalServiceError
+│   ├── exceptions.py        # Base APIException
 │   ├── pagination.py        # PaginationParams, pagination meta builder
 │   ├── responses.py         # SuccessResponse / ErrorResponse envelopes
 │   └── logging.py           # loguru setup (structured JSON sink)
@@ -251,8 +251,6 @@ class ResourceNotFoundException(APIException):
 raise ResourceNotFoundException()
 raise ResourceNotFoundException(message=f"Resource {id} not found.")
 ```
-
-Use a separate `ExternalServiceError` (e.g. 503) for failed third-party dependencies.
 
 ### Centralized handlers — `core/error_handlers.py`
 

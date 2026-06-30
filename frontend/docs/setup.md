@@ -17,19 +17,36 @@ How to run the frontend locally and via Docker.
 
 ## Environment variables
 
-- `VITE_API_URL` — base URL of the backend API. See `.env.example`. Only consumed once real API
-  integration lands; the app currently runs entirely on the in-memory mock layer
-  (see `mock-data.md`).
+- `VITE_API_URL` — base URL of the backend API **as seen by the browser**, so it points at the
+  backend's host port: `http://localhost:8088/api` (default in `docker-compose.dev.yml`). Not the
+  in-network `backend:8000`. Set it in the repo-root `./.env` (see root `./.env.example`). Only
+  consumed once real API integration lands; the app currently runs entirely on the in-memory
+  mock layer (see `mock-data.md`).
 - Keep secrets out of the frontend; only public config belongs here.
 
-## Running with Docker
+## Running with Docker (primary path)
 
 ```bash
-docker compose up --build      # starts db + backend + frontend
+docker compose -f docker-compose.dev.yml up --build   # db + backend + frontend, hot reload
 ```
 
-The frontend service mounts the source for hot reload and talks to the backend at the
-configured API URL.
+- Frontend (Vite dev server, hot reload): <http://localhost:5174>
+- Host port **5174** (container 5174) — remapped off Vite's default 5173 to avoid clashing with
+  a local dev server; same port in/out keeps HMR's websocket working.
+- Source is bind-mounted; `node_modules` stays in the image (anonymous volume).
+
+## Running in production
+
+```bash
+DB_PASSWORD=... JWT_SECRET=... \
+  docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The standalone `docker-compose.prod.yml` builds the frontend's **prod** image (`target: prod` in `frontend/Dockerfile`) builds the SPA and
+serves it with **nginx** (`frontend/nginx.conf`). That nginx is the **single published origin**
+(`:80`): it serves static assets and proxies `/api` → `backend:8000`, so the client uses a
+relative `/api` (`VITE_API_URL=/api`, inlined at build time) with no CORS. TLS is terminated
+externally. Full stack detail in `backend/docs/setup.md`.
 
 ## Running outside Docker
 
