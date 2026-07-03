@@ -35,6 +35,8 @@ without asking first.
 - **`docs/auth-client.md`** — the live auth plumbing: token storage (`localStorage`), the Axios
   request/response interceptors, and transparent token refresh on `AUTH_TOKEN_EXPIRED`.
 - **`docs/setup.md`** — local dev, Docker, environment variables, scripts.
+- **`docs/pwa.md`** — the installable PWA: `vite-plugin-pwa` config, manifest/icons, app-shell
+  offline scope (never caches `/api/`), auto-update service worker.
 - **`docs/decisions.md`** — running log of confirmed frontend decisions. Anything not here is
   open — ask.
 

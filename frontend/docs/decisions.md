@@ -172,6 +172,15 @@ ask before assuming.
 - **API client pagination (2026-07-01):** the Axios response interceptor now **preserves the
   `pagination` block** (the `{ data }` unwrap previously dropped it); added typed `getPage<T>` and
   `getAll<T>` helpers to `lib/api-client.ts` for paginated list endpoints. See `auth-client.md`.
+- **PWA (2026-07-03):** the frontend is a full installable PWA via **`vite-plugin-pwa`**
+  (Workbox `generateSW`): manifest + icons derived from `public/mizan.svg`, **app-shell-only**
+  offline scope (`/api/` never cached — no stale money data), **auto-update** service worker,
+  `nginx.conf` serves `sw.js`/`index.html` with `no-cache`; `devOptions.enabled` makes the dev
+  server installable too. **No notifications/push for now.** Full detail in `pwa.md`.
+- **About card (2026-07-03):** the Settings screen gets a static **About Mizan** card (below the
+  savings card, in `features/settings/.../SettingsScreen.tsx`): the app is an open-source project
+  built by Abderrahmane Elasri for personal use, with a link to the GitHub repo
+  (`https://github.com/Abderrahman-byte/mizan`) for suggestions. No new route or nav item.
 
 ## OPEN — must be decided with the user before implementing
 

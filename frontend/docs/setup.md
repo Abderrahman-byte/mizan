@@ -34,6 +34,9 @@ docker compose -f docker-compose.dev.yml up --build   # db + backend + frontend,
 - Host port **5174** (container 5174) — remapped off Vite's default 5173 to avoid clashing with
   a local dev server; same port in/out keeps HMR's websocket working.
 - Source is bind-mounted; `node_modules` stays in the image (anonymous volume).
+- **After adding/bumping a dependency**, run `up --build -V` once: the stale anonymous
+  `node_modules` volume otherwise shadows the rebuilt image's and Vite fails with
+  `ERR_MODULE_NOT_FOUND`. (Never `down -v` — that also wipes the dev database volume.)
 
 ## Running in production
 
@@ -48,6 +51,12 @@ serves static assets and proxies `/api` → `backend:8000`, so the client uses a
 (`VITE_API_URL=/api`, inlined at build time) with no CORS. It publishes **`127.0.0.1:8080`**
 only; the public entry point is a **host nginx** (`deploy/nginx/mizan.conf`) that terminates TLS
 (Cloudflare Origin CA cert) in front of it. Full stack detail in `backend/docs/setup.md`.
+
+The production build is a **PWA**: `vite build` also emits `manifest.webmanifest` and a Workbox
+service worker (`sw.js`) via `vite-plugin-pwa` — see `pwa.md`. `nginx.conf` serves `sw.js` and
+`index.html` with `Cache-Control: no-cache` so new deploys activate promptly. The service worker
+also runs in **dev** (`devOptions.enabled`, scratch files in gitignored `dev-dist/`) so the dev
+server is installable too; still test real PWA behavior with `npm run build && npm run preview`.
 
 ## Running outside Docker
 
