@@ -5,8 +5,10 @@ module-level ``settings`` instance (per conventions: no ``@lru_cache`` + getter)
 Non-env-configurable constants (formulas, intervals) do NOT belong here.
 """
 
+from typing import Annotated
+
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -32,10 +34,9 @@ class Settings(BaseSettings):
     # (local dev: Vite at :5173/:5174 → API at :8000/:8088); in prod the SPA is
     # same-origin behind nginx, so this is a no-op there. Comma-separated in the
     # environment, e.g. CORS_ORIGINS="http://localhost:5173,http://localhost:5174".
-    cors_origins: list[str] = [
-        "http://localhost:5173",
-        "http://localhost:5174",
-    ]
+    # NoDecode stops the env source from JSON-decoding the value itself (which
+    # would fail on a comma-separated string) so the validator below gets it raw.
+    cors_origins: Annotated[list[str], NoDecode] = []
 
     @field_validator("cors_origins", mode="before")
     @classmethod
