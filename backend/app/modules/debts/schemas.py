@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -221,3 +221,89 @@ class DebtSummaryTotals(_CamelModel):
     total_i_owe: Money
     total_owed_to_me: Money
     net: Money
+
+
+# --- Export / import (the portable "mizan-debts" document) ------------------------------------
+#
+# One schema set serves both directions by design: the document IS the file format, produced by
+# GET /debts/export and accepted verbatim by POST /debts/import (decision 2026-07-03). It carries
+# no DB ids so it is portable across accounts; counterparties are matched by name on import.
+
+EXPORT_VERSION = 1
+
+# Round-trip money: validated like MoneyInput on import, serialized as a 2dp string on export.
+MoneyPortable = Annotated[
+    Decimal,
+    Field(gt=0, max_digits=12, decimal_places=2),
+    PlainSerializer(lambda v: f"{v:.2f}", return_type=str, when_used="json"),
+]
+
+
+class ExportRepayment(_CamelModel):
+    amount: MoneyPortable
+    paid_on: date
+    note: str | None = Field(default=None, max_length=NOTE_MAX_LENGTH)
+
+    @field_validator("note")
+    @classmethod
+    def _strip_note(cls, value: str | None) -> str | None:
+        return _strip_optional(value)
+
+
+class ExportDebt(_CamelModel):
+    direction: DebtDirection
+    principal_amount: MoneyPortable
+    description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
+    incurred_on: date
+    written_off_at: date | None = None
+    repayments: list[ExportRepayment] = Field(default_factory=list)
+
+    @field_validator("description")
+    @classmethod
+    def _strip_description(cls, value: str | None) -> str | None:
+        return _strip_optional(value)
+
+
+class ExportCounterparty(_CamelModel):
+    name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
+    note: str | None = Field(default=None, max_length=NOTE_MAX_LENGTH)
+    debts: list[ExportDebt] = Field(default_factory=list)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Name must not be blank.")
+        return value
+
+    @field_validator("note")
+    @classmethod
+    def _strip_note(cls, value: str | None) -> str | None:
+        return _strip_optional(value)
+
+
+class DebtExportDocument(_CamelModel):
+    format: Literal["mizan-debts"] = "mizan-debts"
+    version: int
+    exported_at: datetime
+    counterparties: list[ExportCounterparty] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_names(self) -> "DebtExportDocument":
+        # Two entries with the same (case-insensitive) name would collide with the per-user
+        # uniqueness rule mid-import; reject the file up front instead.
+        seen: set[str] = set()
+        for cp in self.counterparties:
+            key = cp.name.lower()
+            if key in seen:
+                raise ValueError(f'Duplicate counterparty name in file: "{cp.name}".')
+            seen.add(key)
+        return self
+
+
+class DebtImportResult(_CamelModel):
+    counterparties_created: int
+    counterparties_matched: int
+    debts_created: int
+    repayments_created: int

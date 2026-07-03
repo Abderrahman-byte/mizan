@@ -173,6 +173,20 @@ isn't decided — and Claude Code must ask before assuming it.
     `incurredOn`/`paidOn` default to today when omitted. Full per-endpoint field lists in
     `docs/debts.md`.
   - See `docs/debts.md` and `docs/schema.md`.
+- **Debt-ledger export/import (2026-07-03, implemented & verified):** two new routes —
+  `GET /debts/export` (200) and `POST /debts/import` (201) — moving the whole ledger as a
+  portable **`mizan-debts` v1 JSON document** (nested counterparties → debts → repayments; no
+  DB ids; money as decimal strings). Chosen over CSV. Export includes **everything** (debt-less
+  counterparties, written-off/settled debts, full repayment history); derived fields are
+  recomputed on import. Import is **merge** semantics: atomic (single transaction),
+  counterparties matched case-insensitively by name (matched ones keep their existing note),
+  every debt in the file created (re-import duplicates debts — accepted trade-off), nothing
+  modified/deleted; responds with created/matched counts. The document is deliberately **one
+  schema for both directions** (documented exception to the separate request/response rule —
+  it is the file format). New error code **400 `UNSUPPORTED_EXPORT_VERSION`**; wrong `format`
+  literal / duplicate in-file names → 400 `VALIDATION_ERROR`. UI lives on the People screen
+  (client-side blob download + file picker; frontend `docs/decisions.md`). Full contract in
+  `docs/debts.md`.
 - **Deployment (2026-07-03):** single VPS running the prod compose stack, fronted by a **host
   nginx** (not containerized) that terminates TLS — config in `deploy/nginx/mizan.conf`. Domain
   **`mizan.abderrahmane.ma`** behind the **Cloudflare proxy** (orange cloud); TLS uses a
@@ -198,8 +212,8 @@ isn't decided — and Claude Code must ask before assuming it.
   **`register`, `login`, `me`, `refresh`, and `logout` are fully implemented** (contracts in
   Confirmed above; the shared Bearer-token auth dependency is built). Only **`forgot-password` /
   `reset-password`** remain undecided (payload, response shape, success status, error codes).
-- The **debt-ledger endpoint surface** (counterparties, debts, repayments, summary — 17 routes) is
-  **fully implemented** (request/response field lists, pagination, money serialization, filters,
+- The **debt-ledger endpoint surface** (counterparties, debts, repayments, summary,
+  export/import — 19 routes) is **fully implemented** (request/response field lists, pagination, money serialization, filters,
   write-off, error codes; see `docs/debts.md`).
 - All other non-auth routes (budgeting, savings) remain entirely undecided.
 

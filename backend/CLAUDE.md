@@ -37,8 +37,8 @@ Read the doc relevant to your task. These hold the *how*; this file is just the 
 - **`docs/auth.md`** — authentication: confirmed mechanism/token/refresh/identity decisions, what
   is still open, and per-piece build status.
 - **`docs/debts.md`** — debt/loan ledger (**implemented**): counterparties, debts, repayments
-  tables; status/over-repayment/write-off rules; the 17-route endpoint surface; contracts; error
-  codes.
+  tables; status/over-repayment/write-off rules; the 19-route endpoint surface (incl. the
+  `mizan-debts` export/import document); contracts; error codes.
 
 ## The layering rule (non-negotiable)
 

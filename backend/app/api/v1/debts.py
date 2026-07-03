@@ -4,8 +4,8 @@ Routes live under ``app/api/`` (decision 2026-06-30); the ``debts`` feature modu
 (``app/modules/debts/``) holds the non-routing layers. Every route is guarded by ``CurrentUser``
 and scoped to that user's rows. Contracts in ``docs/debts.md``.
 
-Route order note: the static ``/summary`` path is declared before the parametrised
-``/{debt_id}`` routes so it is never parsed as a debt id.
+Route order note: the static ``/summary``, ``/export``, and ``/import`` paths are declared
+before the parametrised ``/{debt_id}`` routes so they are never parsed as a debt id.
 """
 
 from fastapi import APIRouter, Query, status
@@ -18,6 +18,8 @@ from app.modules.debts.enums import DebtDirection, DebtStatus
 from app.modules.debts.schemas import (
     DebtCreateRequest,
     DebtDetailResponse,
+    DebtExportDocument,
+    DebtImportResult,
     DebtSummaryResponse,
     DebtSummaryTotals,
     DebtUpdateRequest,
@@ -81,6 +83,34 @@ async def debts_summary(
 ) -> SuccessResponse[DebtSummaryTotals]:
     """Global net position: ``totalIOwe`` / ``totalOwedToMe`` / ``net`` (written-off excluded)."""
     result = await service.summary(session, current_user.id)
+    return SuccessResponse(data=result)
+
+
+@router.get("/export", response_model=SuccessResponse[DebtExportDocument])
+async def export_debts(
+    current_user: CurrentUser,
+    session: DBSession,
+) -> SuccessResponse[DebtExportDocument]:
+    """The whole ledger as a portable ``mizan-debts`` v1 document (all counterparties, all
+    debts incl. written-off, full repayment history; no DB ids). Contract in ``docs/debts.md``."""
+    result = await service.export_ledger(session, current_user.id)
+    return SuccessResponse(data=result)
+
+
+@router.post(
+    "/import",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SuccessResponse[DebtImportResult],
+)
+async def import_debts(
+    payload: DebtExportDocument,
+    current_user: CurrentUser,
+    session: DBSession,
+) -> SuccessResponse[DebtImportResult]:
+    """Merge a ``mizan-debts`` document into the ledger (atomic). Counterparties match by name
+    (case-insensitive); all debts in the file are created. Unknown version → 400
+    ``UNSUPPORTED_EXPORT_VERSION``."""
+    result = await service.import_ledger(session, current_user.id, payload)
     return SuccessResponse(data=result)
 
 

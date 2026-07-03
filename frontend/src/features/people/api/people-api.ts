@@ -8,7 +8,9 @@ import type {
   CreateDebtPayload,
   CreateRepaymentPayload,
   Debt,
+  DebtExportDocument,
   DebtFilters,
+  DebtImportResult,
   DebtSummaryTotals,
   Repayment,
   UpdateCounterpartyPayload,
@@ -144,6 +146,20 @@ export async function getSummary(): Promise<DebtSummaryTotals> {
     totalOwedToMe: Number(res.data.totalOwedToMe),
     net: Number(res.data.net),
   };
+}
+
+// --- export / import ---
+
+/** Fetch the whole ledger as a portable mizan-debts document (money stays as strings). */
+export async function exportDebts(): Promise<DebtExportDocument> {
+  const res = await apiClient.get<DebtExportDocument>('/v1/debts/export');
+  return res.data;
+}
+
+/** Merge a mizan-debts document into the ledger (atomic on the backend). */
+export async function importDebts(doc: DebtExportDocument): Promise<DebtImportResult> {
+  const res = await apiClient.post<DebtImportResult>('/v1/debts/import', doc);
+  return res.data;
 }
 
 // --- repayments ---

@@ -71,6 +71,29 @@ async def list_counterparties(
     return list(result.scalars().all())
 
 
+async def list_all_counterparties(
+    session: AsyncSession, *, user_id: int
+) -> list[Counterparty]:
+    """Every counterparty of a user, unpaginated (backs the import name-matching)."""
+    result = await session.execute(
+        select(Counterparty).where(Counterparty.user_id == user_id)
+    )
+    return list(result.scalars().all())
+
+
+async def list_counterparties_with_debts(
+    session: AsyncSession, *, user_id: int
+) -> list[Counterparty]:
+    """Every counterparty with debts + repayments eager-loaded (backs the ledger export)."""
+    result = await session.execute(
+        select(Counterparty)
+        .where(Counterparty.user_id == user_id)
+        .options(selectinload(Counterparty.debts).selectinload(Debt.repayments))
+        .order_by(func.lower(Counterparty.name), Counterparty.id)
+    )
+    return list(result.scalars().all())
+
+
 async def count_counterparties(session: AsyncSession, *, user_id: int) -> int:
     result = await session.execute(
         select(func.count())
@@ -252,6 +275,7 @@ async def create_debt(
     principal_amount: Decimal,
     description: str | None,
     incurred_on: date,
+    written_off_at: date | None = None,
 ) -> Debt:
     debt = Debt(
         user_id=user_id,
@@ -260,6 +284,7 @@ async def create_debt(
         principal_amount=principal_amount,
         description=description,
         incurred_on=incurred_on,
+        written_off_at=written_off_at,
     )
     session.add(debt)
     await session.flush()

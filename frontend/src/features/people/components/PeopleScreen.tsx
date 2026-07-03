@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardHeading, Icon, Pill } from '@/components';
 import { formatAmountDH, formatNumber } from '@/utils/format';
-import { usePeople } from '../stores/people-store';
+import * as peopleApi from '../api/people-api';
+import { apiErrorMessage, usePeople } from '../stores/people-store';
+import type { DebtExportDocument } from '../types/debts';
 import { PersonRow } from './PersonRow';
 import { PersonDetail } from './PersonDetail';
 import { OWE_YOU, YOU_OWE } from './person-helpers';
@@ -13,13 +15,18 @@ type BalanceFilter = 'all' | 'owed' | 'owe';
 const PAGE_SIZE = 8;
 
 export function PeopleScreen() {
-  const { counterparties, summary } = usePeople();
+  const { counterparties, summary, refresh } = usePeople();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mobileId, setMobileId] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<BalanceFilter>('all');
   const [page, setPage] = useState(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferMsg, setTransferMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(
+    null,
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -61,6 +68,51 @@ export function PeopleScreen() {
     setQuery('');
   };
 
+  /** Download the whole ledger as mizan-debts-<date>.json (built client-side so the
+   *  Authorization header applies — a plain <a href> download wouldn't carry it). */
+  const handleExport = async () => {
+    setTransferBusy(true);
+    setTransferMsg(null);
+    try {
+      const doc = await peopleApi.exportDebts();
+      const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mizan-debts-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setTransferMsg({ kind: 'err', text: apiErrorMessage(err, 'Export failed.') });
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+
+  const handleImportFile = async (file: File) => {
+    setTransferBusy(true);
+    setTransferMsg(null);
+    try {
+      let doc: DebtExportDocument;
+      try {
+        doc = JSON.parse(await file.text()) as DebtExportDocument;
+      } catch {
+        throw { message: 'That file is not valid JSON.' };
+      }
+      const result = await peopleApi.importDebts(doc);
+      await refresh();
+      const people = result.counterpartiesCreated + result.counterpartiesMatched;
+      setTransferMsg({
+        kind: 'ok',
+        text: `Imported ${result.debtsCreated} debts and ${result.repaymentsCreated} repayments across ${people} people (${result.counterpartiesCreated} new).`,
+      });
+    } catch (err) {
+      setTransferMsg({ kind: 'err', text: apiErrorMessage(err, 'Import failed.') });
+    } finally {
+      setTransferBusy(false);
+    }
+  };
+
   const list = (
     <Card flush className="px-2.5 py-3">
       {searchOpen ? (
@@ -92,15 +144,72 @@ export function PeopleScreen() {
       ) : (
         <div className="flex items-center justify-between px-2 pb-2.5 pt-1">
           <CardHeading>People · {counterparties.length}</CardHeading>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={transferBusy}
+              aria-label="Export debt data"
+              title="Download your debt data as a JSON file"
+              className="rounded-full disabled:opacity-40"
+            >
+              <Pill className="px-2.5 py-1.5 text-xs">
+                <Icon name="arrowDn" size={14} /> Export
+              </Pill>
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={transferBusy}
+              aria-label="Import debt data"
+              title="Import debt data from a JSON file"
+              className="rounded-full disabled:opacity-40"
+            >
+              <Pill className="px-2.5 py-1.5 text-xs">
+                <Icon name="arrowUp" size={14} /> Import
+              </Pill>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = ''; // allow re-picking the same file
+                if (file) void handleImportFile(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search people"
+              title="Search people"
+              className="rounded-full"
+            >
+              {/* the magnifier reads on its own, so the label may yield space to Export/Import */}
+              <Pill className="px-2.5 py-1.5 text-xs">
+                <Icon name="search" size={14} /> <span className="hidden sm:inline">Search</span>
+              </Pill>
+            </button>
+          </div>
+        </div>
+      )}
+      {transferMsg && (
+        <div
+          className={
+            'flex items-start justify-between gap-2 px-2 pb-2.5 text-[13px] font-semibold ' +
+            (transferMsg.kind === 'err' ? 'text-warn' : 'text-ink-soft')
+          }
+        >
+          <span>{transferMsg.text}</span>
           <button
             type="button"
-            onClick={() => setSearchOpen(true)}
-            aria-label="Search people"
-            className="rounded-full"
+            onClick={() => setTransferMsg(null)}
+            aria-label="Dismiss message"
+            className="mt-0.5 flex-none text-ink-faint transition hover:text-ink"
           >
-            <Pill className="px-2.5 py-1.5 text-xs">
-              <Icon name="search" size={14} /> Search
-            </Pill>
+            <Icon name="close" size={14} />
           </button>
         </div>
       )}

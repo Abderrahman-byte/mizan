@@ -25,18 +25,25 @@ from app.modules.debts.exceptions import (
     CounterpartyNotFoundException,
     DebtNotFoundException,
     RepaymentNotFoundException,
+    UnsupportedExportVersionException,
 )
 from app.modules.debts.models import Counterparty, Debt
 from app.modules.debts.schemas import (
+    EXPORT_VERSION,
     CounterpartyCreateRequest,
     CounterpartyRef,
     CounterpartyResponse,
     CounterpartyUpdateRequest,
     DebtCreateRequest,
     DebtDetailResponse,
+    DebtExportDocument,
+    DebtImportResult,
     DebtSummaryResponse,
     DebtSummaryTotals,
     DebtUpdateRequest,
+    ExportCounterparty,
+    ExportDebt,
+    ExportRepayment,
     RepaymentCreateRequest,
     RepaymentResponse,
     RepaymentUpdateRequest,
@@ -350,6 +357,111 @@ async def summary(session: AsyncSession, user_id: int) -> DebtSummaryTotals:
         total_i_owe=total_i_owe,
         total_owed_to_me=total_owed_to_me,
         net=total_owed_to_me - total_i_owe,
+    )
+
+
+# --- Export / import ------------------------------------------------------------------------
+
+
+async def export_ledger(session: AsyncSession, user_id: int) -> DebtExportDocument:
+    """The user's whole ledger as a portable ``mizan-debts`` document (no DB ids)."""
+    counterparties = await repository.list_counterparties_with_debts(
+        session, user_id=user_id
+    )
+    return DebtExportDocument(
+        version=EXPORT_VERSION,
+        exported_at=datetime.now(timezone.utc),
+        counterparties=[
+            ExportCounterparty(
+                name=c.name,
+                note=c.note,
+                debts=[
+                    ExportDebt(
+                        direction=d.direction,
+                        principal_amount=d.principal_amount,
+                        description=d.description,
+                        incurred_on=d.incurred_on,
+                        written_off_at=d.written_off_at,
+                        repayments=[
+                            ExportRepayment(amount=r.amount, paid_on=r.paid_on, note=r.note)
+                            for r in sorted(d.repayments, key=lambda r: (r.paid_on, r.id))
+                        ],
+                    )
+                    for d in sorted(c.debts, key=lambda d: (d.incurred_on, d.id))
+                ],
+            )
+            for c in counterparties
+        ],
+    )
+
+
+async def import_ledger(
+    session: AsyncSession, user_id: int, document: DebtExportDocument
+) -> DebtImportResult:
+    """Merge a ``mizan-debts`` document into the user's ledger, atomically.
+
+    Counterparties are matched case-insensitively by name; matched ones keep their existing
+    note. Debts have no natural key, so every debt in the file is created — re-importing the
+    same file duplicates them (documented merge semantics). One commit at the end: any failure
+    rolls the whole import back.
+    """
+    if document.version != EXPORT_VERSION:
+        raise UnsupportedExportVersionException(
+            message=f"Unsupported export file version {document.version}; "
+            f"this server reads version {EXPORT_VERSION}."
+        )
+
+    existing = {
+        c.name.lower(): c
+        for c in await repository.list_all_counterparties(session, user_id=user_id)
+    }
+    counterparties_created = counterparties_matched = 0
+    debts_created = repayments_created = 0
+
+    for entry in document.counterparties:
+        counterparty = existing.get(entry.name.lower())
+        if counterparty is None:
+            counterparty = await repository.create_counterparty(
+                session, user_id=user_id, name=entry.name, note=entry.note
+            )
+            counterparties_created += 1
+        else:
+            counterparties_matched += 1
+        for debt_entry in entry.debts:
+            debt = await repository.create_debt(
+                session,
+                user_id=user_id,
+                counterparty_id=counterparty.id,
+                direction=debt_entry.direction,
+                principal_amount=debt_entry.principal_amount,
+                description=debt_entry.description,
+                incurred_on=debt_entry.incurred_on,
+                written_off_at=debt_entry.written_off_at,
+            )
+            debts_created += 1
+            for repayment_entry in debt_entry.repayments:
+                await repository.create_repayment(
+                    session,
+                    debt_id=debt.id,
+                    amount=repayment_entry.amount,
+                    paid_on=repayment_entry.paid_on,
+                    note=repayment_entry.note,
+                )
+                repayments_created += 1
+
+    await session.commit()
+    logger.bind(
+        user_id=user_id,
+        counterparties_created=counterparties_created,
+        counterparties_matched=counterparties_matched,
+        debts_created=debts_created,
+        repayments_created=repayments_created,
+    ).info("ledger imported")
+    return DebtImportResult(
+        counterparties_created=counterparties_created,
+        counterparties_matched=counterparties_matched,
+        debts_created=debts_created,
+        repayments_created=repayments_created,
     )
 
 

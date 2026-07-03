@@ -45,3 +45,11 @@ class RepaymentNotFoundException(APIException):
     status_code = 404
     code = "REPAYMENT_NOT_FOUND"
     message = "Repayment not found."
+
+
+class UnsupportedExportVersionException(APIException):
+    """Raised when an imported ledger file declares a version this server can't read (400)."""
+
+    status_code = 400
+    code = "UNSUPPORTED_EXPORT_VERSION"
+    message = "Unsupported export file version."

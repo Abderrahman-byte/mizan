@@ -158,6 +158,17 @@ ask before assuming.
   the **Summary** screen's `Outstanding` now consumes live `counterparties`. Verified end-to-end in
   a headless browser against the running stack. Remaining domain features (budget, transactions,
   savings, history) stay on the mock layer.
+- **Debt data export/import UI (2026-07-03):** the People list header gains labelled
+  **Export** (`arrowDn`) and **Import** (`arrowUp`) pills beside Search (icon-only pills were
+  tried first and rejected as unclear; the Search pill collapses to its magnifier icon below
+  `sm` so the row fits on phones), wired to the new backend routes (`backend/docs/debts.md` → "Export / import"). Export fetches
+  `GET /debts/export` through the Axios client and saves it **client-side as a Blob**
+  (`mizan-debts-<YYYY-MM-DD>.json`) — chosen over an `<a href>` download so the `Authorization`
+  header applies. Import opens a hidden file picker, `JSON.parse`s the file, `POST`s it to
+  `/debts/import`, then `refresh()`es the store; a dismissible status line under the header
+  shows the imported counts (or the error, `text-warn`). New wire types in `types/debts.ts`
+  (`DebtExportDocument` etc.) keep money as **decimal strings** — the document round-trips
+  verbatim, no number parsing. New api functions `exportDebts` / `importDebts`.
 - **API client pagination (2026-07-01):** the Axios response interceptor now **preserves the
   `pagination` block** (the `{ data }` unwrap previously dropped it); added typed `getPage<T>` and
   `getAll<T>` helpers to `lib/api-client.ts` for paginated list endpoints. See `auth-client.md`.

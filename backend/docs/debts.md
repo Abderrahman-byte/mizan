@@ -147,6 +147,15 @@ existence). Standard success/error envelope applies.
 |----------------------|----------------------------------------------------------|---------|
 | `GET /debts/summary` | Global net position: `totalIOwe`, `totalOwedToMe`, `net`.| 200     |
 
+### Export / import (added 2026-07-03)
+
+| Method & path        | Purpose                                                          | Success |
+|----------------------|------------------------------------------------------------------|---------|
+| `GET /debts/export`  | Whole ledger as a portable `mizan-debts` document (see below).   | 200     |
+| `POST /debts/import` | Merge a `mizan-debts` document into the ledger (atomic).         | 201     |
+
+(`/summary`, `/export`, and `/import` are static paths declared before `/{debt_id}`.)
+
 ---
 
 ## Request / response contracts
@@ -239,6 +248,62 @@ and both `write-off` routes: the summary shape **plus** an embedded `repayments`
 ```
 All decimal strings; written-off debts excluded; `net = totalOwedToMe − totalIOwe`.
 
+### Export / import: the `mizan-debts` document
+
+One schema serves both directions **by design** (a deliberate exception to the separate
+request/response rule): the document *is* the file format — `GET /debts/export` returns it (in
+the standard `{ data }` envelope) and `POST /debts/import` accepts it verbatim as the body.
+It carries **no DB ids**, so it is portable across accounts:
+
+```jsonc
+{
+  "format": "mizan-debts",            // literal; anything else → 400 VALIDATION_ERROR
+  "version": 1,                       // unsupported value → 400 UNSUPPORTED_EXPORT_VERSION
+  "exportedAt": "2026-07-03T12:00:00Z",
+  "counterparties": [                 // ALL of them (even debt-less), sorted by lower(name)
+    {
+      "name": "Karim",
+      "note": "neighbour",            // nullable
+      "debts": [                      // ALL debts incl. written-off/settled, by incurredOn
+        {
+          "direction": "I_OWE",
+          "principalAmount": "1500.50",
+          "description": "car repair",   // nullable
+          "incurredOn": "2026-06-01",
+          "writtenOffAt": null,          // date | null
+          "repayments": [                // full history, ordered by paidOn
+            { "amount": "500.00", "paidOn": "2026-06-20", "note": null }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Money/date/enum formats are the same as the rest of the API (decimal strings, `YYYY-MM-DD`,
+`"I_OWE"`/`"OWED_TO_ME"`). Derived fields (`outstanding`, `status`, `balance`) and timestamps
+(`createdAt`/`updatedAt`) are **not** exported — they are recomputed/re-stamped on import.
+
+**Import semantics (merge):**
+
+- Applied **atomically** — one transaction; any failure imports nothing.
+- Counterparties are matched **case-insensitively by name** against the user's existing ones;
+  a matched counterparty **keeps its existing note** (the file's note is used only when the
+  counterparty is newly created). Duplicate names *within the file* → 400 `VALIDATION_ERROR`.
+- Debts have no natural key, so **every debt in the file is created** — re-importing the same
+  file duplicates its debts (accepted merge trade-off, decision 2026-07-03).
+- Nothing existing is ever modified or deleted.
+- Success **201** with counts:
+  ```jsonc
+  { "data": { "counterpartiesCreated": 2, "counterpartiesMatched": 1,
+              "debtsCreated": 5, "repaymentsCreated": 9 } }
+  ```
+
+The frontend (People screen) downloads the export client-side as
+`mizan-debts-<YYYY-MM-DD>.json` (blob, so the `Authorization` header applies) and imports via a
+file picker.
+
 ---
 
 ## Error codes (Mizan-specific, this feature)
@@ -250,5 +315,6 @@ All decimal strings; written-off debts excluded; `net = totalOwedToMe − totalI
 | 404  | `COUNTERPARTY_NOT_FOUND`  | No such counterparty for this user.                   |
 | 404  | `DEBT_NOT_FOUND`          | No such debt for this user.                           |
 | 404  | `REPAYMENT_NOT_FOUND`     | No such repayment under this debt.                    |
+| 400  | `UNSUPPORTED_EXPORT_VERSION` | Imported `mizan-debts` file declares an unknown `version`. |
 
 (Validation/auth codes reuse the shared catalogue in `conventions.md`.)

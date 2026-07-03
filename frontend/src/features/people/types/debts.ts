@@ -101,3 +101,42 @@ export interface DebtFilters {
   direction?: DebtDirection;
   status?: DebtStatus;
 }
+
+// --- export / import (the portable "mizan-debts" document) ---
+// The document round-trips as-is (GET /debts/export → file → POST /debts/import), so money
+// stays as decimal strings here — no number parsing.
+
+export interface ExportRepayment {
+  amount: string;
+  paidOn: string; // YYYY-MM-DD
+  note: string | null;
+}
+
+export interface ExportDebt {
+  direction: DebtDirection;
+  principalAmount: string;
+  description: string | null;
+  incurredOn: string; // YYYY-MM-DD
+  writtenOffAt: string | null;
+  repayments: ExportRepayment[];
+}
+
+export interface ExportCounterparty {
+  name: string;
+  note: string | null;
+  debts: ExportDebt[];
+}
+
+export interface DebtExportDocument {
+  format: 'mizan-debts';
+  version: number;
+  exportedAt: string;
+  counterparties: ExportCounterparty[];
+}
+
+export interface DebtImportResult {
+  counterpartiesCreated: number;
+  counterpartiesMatched: number;
+  debtsCreated: number;
+  repaymentsCreated: number;
+}
