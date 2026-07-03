@@ -10,9 +10,10 @@ ask before assuming.
     `node:22-slim`, host port **5174** (remapped off 5173), source bind-mounted,
     `VITE_API_URL=http://localhost:8088/api` (browser → backend host port).
   - **Prod** (`target: prod`, used by `docker-compose.prod.yml`): built SPA served by
-    **nginx** (`frontend/nginx.conf`), which is the **single published origin** (`:80`) and
-    proxies `/api` → `backend:8000`. Built with `VITE_API_URL=/api` (relative, same-origin → no
-    CORS). See `setup.md`.
+    **nginx** (`frontend/nginx.conf`), which proxies `/api` → `backend:8000`. Built with
+    `VITE_API_URL=/api` (relative, same-origin → no CORS). Published on `127.0.0.1:8080`
+    behind a TLS-terminating **host nginx** (2026-07-03; see `deploy/nginx/mizan.conf` and
+    `backend/docs/decisions.md`). See `setup.md`.
 - **Stack:** React, Tailwind CSS, Axios.
 - **Architecture:** Bulletproof React (feature-based, unidirectional imports, typed API layer).
   See `architecture.md`.

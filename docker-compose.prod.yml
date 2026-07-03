@@ -3,11 +3,11 @@
 #   DB_PASSWORD=... JWT_SECRET=... \
 #     docker compose -f docker-compose.prod.yml up -d --build
 #
-# Topology: the `frontend` nginx is the single published entry point (:80). It
-# serves the built SPA and proxies /api to the backend. `backend` and `db` are
-# reachable only inside the Docker network (no published host ports).
-#
-# TLS is terminated externally (cloud LB / ingress) in front of :80.
+# Topology: a HOST nginx (deploy/nginx/mizan.conf) is the public entry point —
+# it terminates TLS (Cloudflare Origin CA cert) and proxies to the `frontend`
+# nginx, published on 127.0.0.1:8080 only. The frontend serves the built SPA
+# and proxies /api to the backend. `backend` and `db` are reachable only inside
+# the Docker network (no published host ports).
 #
 # Required secrets (NO insecure defaults in prod): DB_PASSWORD, JWT_SECRET.
 # Provide them via the environment or the root ./.env. The stack refuses to start
@@ -60,9 +60,10 @@ services:
         # Single-origin: relative path, proxied to the backend by nginx.
         VITE_API_URL: /api
     restart: unless-stopped
-    # The only published port. TLS is handled upstream.
+    # Loopback-only: reached exclusively through the host nginx, which
+    # terminates TLS (see deploy/nginx/mizan.conf).
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       backend:
         condition: service_healthy

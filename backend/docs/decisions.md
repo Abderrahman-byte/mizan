@@ -173,6 +173,15 @@ isn't decided — and Claude Code must ask before assuming it.
     `incurredOn`/`paidOn` default to today when omitted. Full per-endpoint field lists in
     `docs/debts.md`.
   - See `docs/debts.md` and `docs/schema.md`.
+- **Deployment (2026-07-03):** single VPS running the prod compose stack, fronted by a **host
+  nginx** (not containerized) that terminates TLS — config in `deploy/nginx/mizan.conf`. Domain
+  **`mizan.abderrahmane.ma`** behind the **Cloudflare proxy** (orange cloud); TLS uses a
+  **Cloudflare Origin CA certificate** (15-year, dashboard-generated, `/etc/ssl/cloudflare/`),
+  zone SSL mode **Full (strict)**; real client IPs restored from `CF-Connecting-IP`. The
+  `frontend` service now publishes **`127.0.0.1:8080`** only (was `:80`) — the host nginx is the
+  sole public listener (80 → 443 redirect). Considered and rejected: Caddy (its auto-ACME
+  advantage is lost behind the Cloudflare proxy) and terminating TLS inside the frontend
+  container. See `docs/setup.md` → "Running in production".
 
 ## OPEN — must be decided with the user before implementing
 

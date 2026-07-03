@@ -16,7 +16,6 @@ COPY . .
 
 EXPOSE 8000
 
-# Default command; docker-compose overrides with --reload for local dev.
-# NOTE: once Alembic + migrations exist, the startup will run
-# `alembic upgrade head` before uvicorn (see docs/setup.md).
+# Default command; compose files override it (dev adds --reload, prod runs
+# `alembic upgrade head` before uvicorn — see docs/setup.md).
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

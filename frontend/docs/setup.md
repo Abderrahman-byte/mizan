@@ -42,11 +42,12 @@ DB_PASSWORD=... JWT_SECRET=... \
   docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-The standalone `docker-compose.prod.yml` builds the frontend's **prod** image (`target: prod` in `frontend/Dockerfile`) builds the SPA and
-serves it with **nginx** (`frontend/nginx.conf`). That nginx is the **single published origin**
-(`:80`): it serves static assets and proxies `/api` → `backend:8000`, so the client uses a
-relative `/api` (`VITE_API_URL=/api`, inlined at build time) with no CORS. TLS is terminated
-externally. Full stack detail in `backend/docs/setup.md`.
+The standalone `docker-compose.prod.yml` builds the frontend's **prod** image (`target: prod` in
+`frontend/Dockerfile`): the SPA is built and served by **nginx** (`frontend/nginx.conf`), which
+serves static assets and proxies `/api` → `backend:8000`, so the client uses a relative `/api`
+(`VITE_API_URL=/api`, inlined at build time) with no CORS. It publishes **`127.0.0.1:8080`**
+only; the public entry point is a **host nginx** (`deploy/nginx/mizan.conf`) that terminates TLS
+(Cloudflare Origin CA cert) in front of it. Full stack detail in `backend/docs/setup.md`.
 
 ## Running outside Docker
 

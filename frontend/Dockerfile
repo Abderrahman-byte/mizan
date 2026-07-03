@@ -5,9 +5,8 @@
 # ---- deps + source ----
 FROM node:22-slim AS base
 WORKDIR /app
-# No lockfile yet, so npm install.
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 COPY . .
 
 # ---- development: Vite dev server ----

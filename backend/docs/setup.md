@@ -72,9 +72,12 @@ DB_PASSWORD=... JWT_SECRET=... \
 
 `docker-compose.prod.yml` is a **standalone** production stack (not an override of the dev file):
 
-- **Single entry point:** the `frontend` nginx publishes `:80` only — it serves the built SPA
-  and proxies `/api` → `backend:8000`. The backend and db have **no published host ports**
-  (network-internal). TLS is terminated externally (cloud LB / ingress) in front of `:80`.
+- **Entry point:** a **host nginx** (`deploy/nginx/mizan.conf`) is the public listener — it
+  terminates TLS for `mizan.abderrahmane.ma` with a **Cloudflare Origin CA certificate** (domain
+  proxied through Cloudflare, SSL mode Full (strict)) and proxies to the `frontend` nginx,
+  published on **`127.0.0.1:8080`** only. The frontend serves the built SPA and proxies `/api`
+  → `backend:8000`. The backend and db have **no published host ports** (network-internal).
+  Install steps and cert paths are in the comments of `deploy/nginx/mizan.conf`.
 - **Backend:** `uvicorn --workers 4` (no `--reload`), code baked into the image (no bind mount),
   `restart: unless-stopped`, healthcheck on `/api/v1/health`.
 - **Secrets:** `DB_PASSWORD` and `JWT_SECRET` are **required** — provide them via the
