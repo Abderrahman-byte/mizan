@@ -36,6 +36,9 @@ Read the doc relevant to your task. These hold the *how*; this file is just the 
   after the user confirms them.
 - **`docs/auth.md`** — authentication: confirmed mechanism/token/refresh/identity decisions, what
   is still open, and per-piece build status.
+- **`docs/debts.md`** — debt/loan ledger (**implemented**): counterparties, debts, repayments
+  tables; status/over-repayment/write-off rules; the 17-route endpoint surface; contracts; error
+  codes.
 
 ## The layering rule (non-negotiable)
 

@@ -6,6 +6,8 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
+from app.core.pagination import PaginationMeta
+
 DataT = TypeVar("DataT")
 
 
@@ -27,3 +29,10 @@ class ErrorResponse(BaseModel):
 
 class SuccessResponse(BaseModel, Generic[DataT]):
     data: DataT
+
+
+class PaginatedResponse(BaseModel, Generic[DataT]):
+    """List envelope: ``data`` array + a ``pagination`` meta block (see ``conventions.md`` §2)."""
+
+    data: list[DataT]
+    pagination: PaginationMeta

@@ -38,4 +38,51 @@ token, never the token itself.
   prefix lets refresh/logout load the row by PK and `verify` the secret (see `auth.md`).
 - Migration: `9f3c1a2b4d5e` (`create refresh_tokens table`).
 
-> Open: all non-auth tables. See `decisions.md`.
+## `counterparties`
+
+Owned by the `debts` module (`app/modules/debts/models.py`). Reusable per-user contacts the debt
+ledger references. Full feature spec/rules in `docs/debts.md`.
+
+| Column     | Type          | Constraints                            | Notes                                  |
+|------------|---------------|----------------------------------------|----------------------------------------|
+| `user_id`  | `BigInteger`  | NOT NULL, FK→`users.id` (CASCADE), idx | Owner. `ix_counterparties_user_id`.    |
+| `name`     | `String(100)` | NOT NULL                               | Person's display name.                 |
+| `note`     | `Text`        | NULL                                   | Free-form note about the person.       |
+
+- **Case-insensitive uniqueness per user:** functional unique index `uq_counterparties_user_name`
+  on `(user_id, lower(name))` — one "Karim" per user. Violation → `409 COUNTERPARTY_NAME_TAKEN`.
+- Migration: `99ef2d53f976`.
+
+## `debts`
+
+Owned by the `debts` module. One discrete loan; `outstanding` and `status` are **derived**
+(never stored — see `engine.py` / `docs/debts.md`).
+
+| Column             | Type            | Constraints                            | Notes                                            |
+|--------------------|-----------------|----------------------------------------|--------------------------------------------------|
+| `user_id`          | `BigInteger`    | NOT NULL, FK→`users.id` (CASCADE), idx | Owner. `ix_debts_user_id`.                       |
+| `counterparty_id`  | `BigInteger`    | NOT NULL, FK→`counterparties.id`, idx  | **No** ondelete cascade — delete is blocked in the service (FK restricts as backstop). `ix_debts_counterparty_id`. |
+| `direction`        | enum `debt_direction` | NOT NULL                         | `I_OWE` \| `OWED_TO_ME` (native PG enum).        |
+| `principal_amount` | `NUMERIC(12,2)` | NOT NULL, CHECK > 0                    | `ck_debts_principal_positive`. DH; no currency column. |
+| `description`      | `String(255)`   | NULL                                   | What the loan was for.                           |
+| `incurred_on`      | `Date`          | NOT NULL                               | When the debt was taken on (defaults to today).  |
+| `written_off_at`   | `Date`          | NULL                                   | Set = forgiven/cancelled (status `written_off`, excluded from reporting). NULL = active. |
+
+- Migration: `99ef2d53f976`.
+
+## `repayments`
+
+Owned by the `debts` module. Partial repayments of one debt. Over-repayment is allowed by design,
+so there is no amount ceiling.
+
+| Column     | Type            | Constraints                            | Notes                              |
+|------------|-----------------|----------------------------------------|------------------------------------|
+| `debt_id`  | `BigInteger`    | NOT NULL, FK→`debts.id` (CASCADE), idx | `ix_repayments_debt_id`.           |
+| `amount`   | `NUMERIC(12,2)` | NOT NULL, CHECK > 0                    | `ck_repayments_amount_positive`.   |
+| `paid_on`  | `Date`          | NOT NULL                               | When this repayment happened (defaults to today). |
+| `note`     | `String(255)`   | NULL                                   | Optional note.                     |
+
+- Migration: `99ef2d53f976`.
+
+> Open: all other non-auth tables (budgeting/spending-mode tables, savings-goal tables). See
+> `decisions.md`.

@@ -141,6 +141,38 @@ isn't decided — and Claude Code must ask before assuming it.
   access token. Revokes **just that one session** (`revoked_at`); returns **204 No Content**. Same
   error resolution as refresh (`REFRESH_TOKEN_INVALID` / `REFRESH_TOKEN_EXPIRED`). Built router →
   `service.logout` (shares `_resolve_refresh_session`) → repository. See `docs/auth.md`.
+- **Debt/loan ledger (2026-06-30 design; implemented 2026-07-01):** the full feature is built and
+  verified end-to-end against the running stack. `debts` module (`app/modules/debts/`:
+  `enums`/`models`/`schemas`/`repository`/`service`/`engine`/`exceptions`), routes in
+  `app/api/v1/counterparties.py` + `app/api/v1/debts.py`, migration `99ef2d53f976` (tables in
+  `docs/schema.md`; `alembic check` clean, upgrade/downgrade roundtrip verified). Added a shared
+  `PaginatedResponse[T]` envelope to `core/responses.py` (the first paginated list endpoints).
+  Full spec in `docs/debts.md`. Key decisions:
+  - **Model:** discrete `debts` (principal + `direction` `I_OWE`/`OWED_TO_ME`) with child
+    `repayments`; `outstanding = principal − Σ repayments` (derived, never stored).
+  - **Counterparties:** reusable per-user `counterparties` table; name **unique per user**
+    (`(user_id, lower(name))`) → **409 `COUNTERPARTY_NAME_TAKEN`**.
+  - **Standalone:** no link to spending modes / budget in v1.
+  - **Status:** derived `open`/`partially_paid`/`settled` (`settled` = `outstanding <= 0`) **+**
+    stored `written_off_at DATE` for forgiven/cancelled debts (status `written_off`, excluded from
+    reporting).
+  - **Over-repayment allowed** — outstanding may go negative; no exceed error.
+  - **Debt fields fully editable** anytime; **repayments fully mutable** (POST/GET/PATCH/DELETE).
+  - **Counterparty delete blocked** while debts reference it → **409 `COUNTERPARTY_HAS_DEBTS`**.
+  - **Reporting (derived):** per-person `balance` inline on `GET /counterparties`; global
+    `GET /debts/summary` → `totalIOwe`/`totalOwedToMe`/`net`.
+  - **Money** `NUMERIC(12,2)` (DH only, no currency column); dates as `DATE`.
+  - **Error codes:** `COUNTERPARTY_NAME_TAKEN`, `COUNTERPARTY_HAS_DEBTS` (409);
+    `COUNTERPARTY_NOT_FOUND`, `DEBT_NOT_FOUND`, `REPAYMENT_NOT_FOUND` (404).
+  - **Contracts (2026-06-30):** `GET /debts` and `GET /counterparties` **paginate**
+    (`?page`/`?page_size`); repayments return as a full list (embedded in debt detail). All
+    **money amounts are decimal strings** (`"1500.50"`), not JSON numbers. `GET /debts` list items
+    are **summary** shape (debt fields + embedded `counterparty {id,name}` + computed
+    `outstanding`/`status`); `repayments[]` appears only in `GET /debts/{id}` detail. `direction`
+    serialized as `"I_OWE"`/`"OWED_TO_ME"`; `status` as `open`/`partially_paid`/`settled`/`written_off`.
+    `incurredOn`/`paidOn` default to today when omitted. Full per-endpoint field lists in
+    `docs/debts.md`.
+  - See `docs/debts.md` and `docs/schema.md`.
 
 ## OPEN — must be decided with the user before implementing
 
@@ -148,14 +180,19 @@ isn't decided — and Claude Code must ask before assuming it.
 
 ### Database schema
 - The `users` and `refresh_tokens` tables are **decided** (see Confirmed above; `docs/schema.md`).
-  All other tables, columns, types, and relationships are still undecided.
+- The **debt-ledger tables** (`counterparties`, `debts`, `repayments`) are **built and migrated**
+  (`99ef2d53f976`; see Confirmed above; `docs/schema.md`).
+- The **budgeting/spending-mode** and **savings-goal** tables remain undecided.
 
 ### API endpoints
 - The **auth endpoint set** (7 routes under `/api/v1/auth`, incl. `GET me`) is decided;
   **`register`, `login`, `me`, `refresh`, and `logout` are fully implemented** (contracts in
   Confirmed above; the shared Bearer-token auth dependency is built). Only **`forgot-password` /
-  `reset-password`** remain undecided (payload, response shape, success status, error codes). All
-  non-auth routes remain entirely undecided.
+  `reset-password`** remain undecided (payload, response shape, success status, error codes).
+- The **debt-ledger endpoint surface** (counterparties, debts, repayments, summary — 17 routes) is
+  **fully implemented** (request/response field lists, pagination, money serialization, filters,
+  write-off, error codes; see `docs/debts.md`).
+- All other non-auth routes (budgeting, savings) remain entirely undecided.
 
 ### Auth (remaining open items)
 - Mechanism, token strategy/format, refresh strategy, JWT lib, the `users`/`refresh_tokens`
@@ -166,9 +203,11 @@ isn't decided — and Claude Code must ask before assuming it.
 
 ### Domain rules
 - How a month is classified into a spending mode (formula/thresholds).
-- How the debt/loan ledger represents owed vs. lent.
+- ~~How the debt/loan ledger represents owed vs. lent.~~ **Decided** — see the debt-ledger entry
+  in Confirmed above and `docs/debts.md`.
 - Savings-goal tracking rules.
-- Any business-rule error codes (`<RULE>_VIOLATION`).
+- Any further business-rule error codes (`<RULE>_VIOLATION`) for budgeting/savings (the debt
+  ledger's codes are recorded in `docs/debts.md`).
 
 ### Project specifics to fill into conventions.md
 - Final module list.
