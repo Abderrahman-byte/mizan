@@ -21,6 +21,7 @@ export function SettingsScreen({ profile, savings, onSaveSavings, onSignOut }: S
     <div className="flex flex-col gap-3.5 lg:max-w-[640px]">
       <ProfileCard profile={profile} onSignOut={onSignOut} />
       <SavingsCard savings={savings} onSave={onSaveSavings} />
+      <AboutCard />
     </div>
   );
 }
@@ -45,6 +46,31 @@ function ProfileCard({ profile, onSignOut }: { profile: SettingsProfile; onSignO
       <Button variant="ghost" onClick={onSignOut} className="w-full">
         <Icon name="arrowOut" size={17} className="mr-1.5" /> Sign out
       </Button>
+    </Card>
+  );
+}
+
+const GITHUB_URL = 'https://github.com/Abderrahman-byte/mizan';
+
+function AboutCard() {
+  return (
+    <Card className="flex flex-col gap-2.5">
+      <CardHeading>About Mizan</CardHeading>
+      <p className="text-[13.5px] text-ink-soft">
+        Mizan (ميزان — “balance”) is an open-source personal budgeting app built by{' '}
+        <b className="text-ink">Abderrahmane Elasri</b> for personal use.
+      </p>
+      <p className="text-[13.5px] text-ink-soft">
+        Suggestions and ideas are welcome — open an issue on GitHub.
+      </p>
+      <a
+        href={GITHUB_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-1 inline-flex items-center gap-1.5 self-start text-[13.5px] font-bold text-ink underline underline-offset-2 hover:text-ink-soft"
+      >
+        View on GitHub <Icon name="arrowOut" size={15} />
+      </a>
     </Card>
   );
 }
