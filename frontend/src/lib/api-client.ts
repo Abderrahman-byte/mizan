@@ -11,6 +11,7 @@
 import axios, {
   type AxiosError,
   type AxiosInstance,
+  type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from "axios";
 import { API_URL } from "@/config/env";
@@ -25,6 +26,22 @@ import {
 export interface ApiError {
   code: string;
   message: string;
+}
+
+/** Pagination meta from a list envelope (`{ data: [...], pagination }`). */
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+/** A page of list results. */
+export interface Page<T> {
+  items: T[];
+  pagination: PaginationMeta;
 }
 
 /** Axios request config carrying our one-shot retry guard. */
@@ -80,10 +97,16 @@ async function refreshTokens(): Promise<string> {
 
 apiClient.interceptors.response.use(
   (response) => {
-    // Unwrap the success envelope so callers receive `data` directly.
+    // Unwrap the success envelope so callers receive `data` directly. For list
+    // responses, the `pagination` block is preserved on the response object (the
+    // unwrap would otherwise drop it) so `getPage` can read it — see below.
     const body = response.data;
     if (body && typeof body === "object" && "data" in body) {
       response.data = body.data;
+      if ("pagination" in body) {
+        (response as AxiosResponse & { pagination?: PaginationMeta }).pagination =
+          body.pagination as PaginationMeta;
+      }
     }
     return response;
   },
@@ -118,3 +141,31 @@ apiClient.interceptors.response.use(
     return Promise.reject(normalizeError(error));
   },
 );
+
+/** GET a paginated list endpoint, returning both the items and the `pagination` meta. */
+export async function getPage<T>(
+  url: string,
+  params?: Record<string, unknown>,
+): Promise<Page<T>> {
+  const res = (await apiClient.get<T[]>(url, { params })) as AxiosResponse<T[]> & {
+    pagination?: PaginationMeta;
+  };
+  return { items: res.data, pagination: res.pagination! };
+}
+
+/** GET every page of a list endpoint and concatenate (for client-side list screens). */
+export async function getAll<T>(
+  url: string,
+  params?: Record<string, unknown>,
+  pageSize = 100,
+): Promise<T[]> {
+  const items: T[] = [];
+  let page = 1;
+  for (;;) {
+    const res = await getPage<T>(url, { ...params, page, page_size: pageSize });
+    items.push(...res.items);
+    if (!res.pagination.hasNext) break;
+    page += 1;
+  }
+  return items;
+}

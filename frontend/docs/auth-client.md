@@ -88,3 +88,15 @@ Sign out button for mobile, where the sidebar is hidden). Initials come from the
 - **Password reset** end-to-end (backend `forgot`/`reset` are 501 stubs) — the `/forgot-password`
   and `/reset-password` screens remain UI shells.
 - **Profile editing** (name/email/password) from Settings.
+
+## Pagination helpers (2026-07-01)
+
+The success-envelope unwrap drops everything but `data`, which would lose the `pagination` block on
+list endpoints. The response interceptor now **also copies `pagination` onto the response object**,
+and `lib/api-client.ts` exports two helpers used by paginated features (first consumer: People):
+
+- `getPage<T>(url, params)` → `{ items, pagination }` for one page.
+- `getAll<T>(url, params, pageSize=100)` → every page concatenated, for client-side list screens
+  that filter/search/paginate in the browser.
+
+Single-resource calls are unaffected (they still receive `data` directly).

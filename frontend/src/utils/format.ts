@@ -20,3 +20,14 @@ export function formatShort(n: Money): string {
 export function formatNumber(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
+
+/** Thousands-separated amount preserving up to 2 decimals (trailing `.00` dropped),
+ *  e.g. `1500.5` → `"1,500.5"`, `250` → `"250"`. For money that can carry centimes. */
+export function formatAmount(n: number): string {
+  return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+/** `formatAmount` with the DH unit, e.g. `1500.5` → `"1,500.5 DH"`. */
+export function formatAmountDH(n: number): string {
+  return formatAmount(n) + ' DH';
+}
