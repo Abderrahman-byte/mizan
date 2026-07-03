@@ -5,7 +5,7 @@ import { PageContainer, PageHeader } from '../layout';
 import { PageError, PageLoading } from './page-status';
 
 export function PeoplePage() {
-  const { addPerson, loading, error } = usePeople();
+  const { createEntry, loading, error } = usePeople();
   const [adding, setAdding] = useState(false);
 
   return (
@@ -23,7 +23,7 @@ export function PeoplePage() {
       <PageContainer>
         {error ? <PageError message={error} /> : loading ? <PageLoading /> : <PeopleScreen />}
       </PageContainer>
-      {adding && <AddPersonModal onClose={() => setAdding(false)} onAdd={addPerson} />}
+      {adding && <AddPersonModal onClose={() => setAdding(false)} onAdd={createEntry} />}
     </>
   );
 }

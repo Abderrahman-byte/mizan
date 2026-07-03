@@ -7,65 +7,115 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Person, PersonEntry } from '@/types';
+import type { ApiError } from '@/lib/api-client';
 import * as peopleApi from '../api/people-api';
+import type {
+  Counterparty,
+  DebtDirection,
+  DebtSummaryTotals,
+  UpdateCounterpartyPayload,
+} from '../types/debts';
+
+/** Input for the combined "New entry" flow: creates a counterparty + an initial debt. */
+export interface NewEntryInput {
+  name: string;
+  direction: DebtDirection;
+  /** Decimal string, e.g. "1500.50". */
+  amount: string;
+  note: string;
+}
 
 interface PeopleContextValue {
-  people: Person[];
+  counterparties: Counterparty[];
+  summary: DebtSummaryTotals | null;
   loading: boolean;
   error: string | null;
-  addPerson: (person: Person) => void;
-  /** Drill-in history for a person; synthesizes a single line when none exists. */
-  historyFor: (person: Person) => PersonEntry[];
+  /** Reload counterparties + summary from the backend (call after debt/repayment mutations). */
+  refresh: () => Promise<void>;
+  createEntry: (input: NewEntryInput) => Promise<void>;
+  updateCounterparty: (id: number, patch: UpdateCounterpartyPayload) => Promise<Counterparty>;
+  removeCounterparty: (id: number) => Promise<void>;
 }
 
 const PeopleContext = createContext<PeopleContextValue | null>(null);
 
 export function PeopleProvider({ children }: { children: ReactNode }) {
-  const [people, setPeople] = useState<Person[]>([]);
-  const [histories, setHistories] = useState<Record<string, PersonEntry[]>>({});
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [summary, setSummary] = useState<DebtSummaryTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const refresh = useCallback(async () => {
+    const [people, totals] = await Promise.all([
+      peopleApi.getCounterparties(),
+      peopleApi.getSummary(),
+    ]);
+    setCounterparties(people);
+    setSummary(totals);
+  }, []);
+
   useEffect(() => {
     let active = true;
-    Promise.all([peopleApi.getPeople(), peopleApi.getPersonHistories()])
-      .then(([ppl, hist]) => {
-        if (!active) return;
-        setPeople(ppl);
-        setHistories(hist);
-      })
+    refresh()
       .catch(() => active && setError('Could not load people.'))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, []);
+  }, [refresh]);
 
-  const addPerson = useCallback((person: Person) => {
-    setPeople((prev) => [person, ...prev]);
-    void peopleApi.addPerson(person);
-  }, []);
-
-  const historyFor = useCallback(
-    (person: Person): PersonEntry[] => {
-      const detailed = histories[person.name];
-      if (detailed && detailed.length) return detailed;
-      return [
-        {
-          date: 'Recent',
-          label: person.note,
-          amount: person.balance,
-          direction: person.balance >= 0 ? 'out' : 'in',
-        },
-      ];
+  const createEntry = useCallback(
+    async ({ name, direction, amount, note }: NewEntryInput) => {
+      const trimmedNote = note.trim() || null;
+      const counterparty = await peopleApi.createCounterparty({
+        name: name.trim(),
+        note: trimmedNote,
+      });
+      try {
+        await peopleApi.createDebt({
+          counterpartyId: counterparty.id,
+          direction,
+          principalAmount: amount,
+          description: trimmedNote,
+        });
+      } catch (err) {
+        // The person was created but the debt wasn't: roll the person back so a retry
+        // doesn't trip the duplicate-name guard, then surface the original error.
+        await peopleApi.deleteCounterparty(counterparty.id).catch(() => undefined);
+        throw err;
+      }
+      await refresh();
     },
-    [histories],
+    [refresh],
   );
 
+  const updateCounterparty = useCallback(
+    async (id: number, patch: UpdateCounterpartyPayload) => {
+      const updated = await peopleApi.updateCounterparty(id, patch);
+      setCounterparties((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      return updated;
+    },
+    [],
+  );
+
+  const removeCounterparty = useCallback(async (id: number) => {
+    await peopleApi.deleteCounterparty(id);
+    setCounterparties((prev) => prev.filter((c) => c.id !== id));
+    void peopleApi.getSummary().then(setSummary).catch(() => undefined);
+  }, []);
+
   const value = useMemo<PeopleContextValue>(
-    () => ({ people, loading, error, addPerson, historyFor }),
-    [people, loading, error, addPerson, historyFor],
+    () => ({
+      counterparties,
+      summary,
+      loading,
+      error,
+      refresh,
+      createEntry,
+      updateCounterparty,
+      removeCounterparty,
+    }),
+    [counterparties, summary, loading, error, refresh, createEntry, updateCounterparty, removeCounterparty],
   );
 
   return <PeopleContext.Provider value={value}>{children}</PeopleContext.Provider>;
@@ -75,4 +125,10 @@ export function usePeople(): PeopleContextValue {
   const ctx = useContext(PeopleContext);
   if (!ctx) throw new Error('usePeople must be used within a PeopleProvider');
   return ctx;
+}
+
+/** Pull a human-readable message off a normalized ApiError (falls back to a default). */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const e = err as Partial<ApiError> | undefined;
+  return (e && typeof e === 'object' && typeof e.message === 'string' && e.message) || fallback;
 }

@@ -1,51 +1,58 @@
 import { useState } from 'react';
 import { FieldLabel, Icon, Modal, TextField } from '@/components';
 import { cn } from '@/utils/cn';
-import type { NewEntryInput } from '../stores/people-store';
+import type { Debt, DebtDirection } from '../types/debts';
 
-export interface AddPersonModalProps {
-  onClose: () => void;
-  onAdd: (input: NewEntryInput) => Promise<void>;
+/** Whole or 2-decimal positive amount. */
+const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
+const today = () => new Date().toISOString().slice(0, 10);
+
+export interface DebtFormValues {
+  direction: DebtDirection;
+  /** Decimal string. */
+  amount: string;
+  description: string;
+  incurredOn: string;
 }
 
-/** Whole or 2-decimal positive amount, e.g. "1500" or "1500.50". */
-const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
+export interface DebtFormModalProps {
+  /** Person's name, shown in the title. */
+  personName: string;
+  /** Prefilled debt when editing; omitted when adding. */
+  debt?: Debt;
+  onClose: () => void;
+  onSubmit: (values: DebtFormValues) => Promise<void>;
+}
 
-/** Record a new person with an initial loan (they owe you) or debt (you owe them). */
-export function AddPersonModal({ onClose, onAdd }: AddPersonModalProps) {
-  const [name, setName] = useState('');
-  const [direction, setDirection] = useState<'owe' | 'debt'>('owe');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+/** Add a new debt to a person, or edit an existing one. */
+export function DebtFormModal({ personName, debt, onClose, onSubmit }: DebtFormModalProps) {
+  const editing = debt != null;
+  const [direction, setDirection] = useState<DebtDirection>(debt?.direction ?? 'OWED_TO_ME');
+  const [amount, setAmount] = useState(debt ? String(debt.principalAmount) : '');
+  const [description, setDescription] = useState(debt?.description ?? '');
+  const [incurredOn, setIncurredOn] = useState(debt?.incurredOn ?? today());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = name.trim().length > 0 && AMOUNT_RE.test(amount) && Number(amount) > 0;
-  const color = direction === 'owe' ? 'var(--good)' : 'var(--cool)';
+  const valid = AMOUNT_RE.test(amount) && Number(amount) > 0 && incurredOn.length === 10;
+  const color = direction === 'OWED_TO_ME' ? 'var(--good)' : 'var(--cool)';
 
   const submit = async () => {
     if (!valid || saving) return;
     setSaving(true);
     setError(null);
     try {
-      await onAdd({
-        name,
-        direction: direction === 'owe' ? 'OWED_TO_ME' : 'I_OWE',
-        amount,
-        note,
-      });
+      await onSubmit({ direction, amount, description, incurredOn });
       onClose();
     } catch (err) {
-      setError(
-        (err as { message?: string })?.message ?? 'Could not save this entry. Please try again.',
-      );
+      setError((err as { message?: string })?.message ?? 'Could not save. Please try again.');
       setSaving(false);
     }
   };
 
   return (
     <Modal
-      title="New entry"
+      title={editing ? 'Edit debt' : `New debt · ${personName}`}
       onClose={onClose}
       footer={
         <button
@@ -53,26 +60,16 @@ export function AddPersonModal({ onClose, onAdd }: AddPersonModalProps) {
           disabled={!valid || saving}
           onClick={submit}
         >
-          <Icon name="check" size={17} /> {saving ? 'Saving…' : 'Save entry'}
+          <Icon name="check" size={17} /> {saving ? 'Saving…' : editing ? 'Save changes' : 'Add debt'}
         </button>
       }
     >
-      <FieldLabel>Who</FieldLabel>
-      <TextField
-        autoFocus
-        type="text"
-        placeholder="e.g. Sara Idrissi"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-      />
-
       <FieldLabel>Direction</FieldLabel>
       <div className="flex gap-2.5">
-        <DirButton on={direction === 'owe'} tone="owe" onClick={() => setDirection('owe')}>
+        <DirButton on={direction === 'OWED_TO_ME'} tone="owe" onClick={() => setDirection('OWED_TO_ME')}>
           <Icon name="arrowOut" size={17} /> They owe you
         </DirButton>
-        <DirButton on={direction === 'debt'} tone="debt" onClick={() => setDirection('debt')}>
+        <DirButton on={direction === 'I_OWE'} tone="debt" onClick={() => setDirection('I_OWE')}>
           <Icon name="arrowIn" size={17} /> You owe them
         </DirButton>
       </div>
@@ -82,7 +79,7 @@ export function AddPersonModal({ onClose, onAdd }: AddPersonModalProps) {
         className="flex items-center justify-center gap-2 rounded-[var(--radius)] border-[1.5px] border-line bg-surface-2 p-3.5"
         style={{ color }}
       >
-        <span className="font-head text-3xl font-bold">{direction === 'owe' ? '+' : '−'}</span>
+        <span className="font-head text-3xl font-bold">{direction === 'OWED_TO_ME' ? '+' : '−'}</span>
         <input
           type="number"
           inputMode="decimal"
@@ -91,19 +88,31 @@ export function AddPersonModal({ onClose, onAdd }: AddPersonModalProps) {
           placeholder="0"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
           className="w-[150px] border-0 bg-transparent text-center font-head text-[34px] font-bold text-inherit outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <span className="text-lg font-extrabold text-ink-soft">DH</span>
       </div>
+      {editing && (
+        <div className="mt-1.5 text-[12px] text-ink-faint">
+          Editing the amount recomputes what's still outstanding against existing repayments.
+        </div>
+      )}
 
-      <FieldLabel>Note</FieldLabel>
+      <FieldLabel>What for</FieldLabel>
       <TextField
         type="text"
-        placeholder="e.g. Dinner split, loan for rent"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
+        placeholder="e.g. Car repair, rent loan"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
+      />
+
+      <FieldLabel>Date</FieldLabel>
+      <TextField
+        type="date"
+        value={incurredOn}
+        max={today()}
+        onChange={(e) => setIncurredOn(e.target.value)}
       />
 
       {error && <div className="mt-3 text-[13px] font-semibold text-warn">{error}</div>}

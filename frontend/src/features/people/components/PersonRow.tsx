@@ -1,11 +1,11 @@
 import { Avatar, initials } from '@/components';
-import type { Person } from '@/types';
 import { cn } from '@/utils/cn';
-import { formatDH } from '@/utils/format';
+import { formatAmountDH } from '@/utils/format';
+import type { Counterparty } from '../types/debts';
 import { colorForBalance, signForBalance, statusForBalance } from './person-helpers';
 
 export interface PersonRowProps {
-  person: Person;
+  person: Counterparty;
   active?: boolean;
   onClick: () => void;
 }
@@ -32,12 +32,12 @@ export function PersonRow({ person, active, onClick }: PersonRowProps) {
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14.5px] font-bold">{person.name}</div>
-        <div className="text-[12.5px] text-ink-soft">{person.note}</div>
+        {person.note && <div className="truncate text-[12.5px] text-ink-soft">{person.note}</div>}
       </div>
       <div className="flex-none text-right">
         <div className="num whitespace-nowrap text-[15px] font-black" style={{ color }}>
           {signForBalance(person.balance)}
-          {person.balance === 0 ? '0 DH' : formatDH(Math.abs(person.balance))}
+          {person.balance === 0 ? '0 DH' : formatAmountDH(Math.abs(person.balance))}
         </div>
         <div className="text-[11.5px] font-extrabold" style={{ color }}>
           {statusForBalance(person.balance)}

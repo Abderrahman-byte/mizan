@@ -141,15 +141,37 @@ ask before assuming.
   first name via `firstNameOf`). `forgot`/`reset-password` stay **UI shells** (backend 501 stubs).
   See `docs/auth-client.md`.
 
+- **People / debt-ledger live integration (2026-07-01):** the **People** feature is now wired to
+  the live backend (`backend/docs/debts.md`) — the **first domain feature off the mock layer**.
+  New feature types (`features/people/types/debts.ts`: `Counterparty`, `Debt`, `Repayment`,
+  `DebtSummaryTotals` + payloads); `api/people-api.ts` rewritten to live calls (counterparties,
+  debts, repayments, summary), mapping money **decimal-strings ↔ numbers** at the boundary. The
+  store now holds `counterparties` + `summary` with `refresh` / `createEntry` /
+  `updateCounterparty` / `removeCounterparty`. **Full debt-management UI**: `PersonDetail` is a
+  debt manager (per-debt `DebtCard`s with derived status/outstanding, add/edit/delete debt,
+  add/edit/delete repayment, write-off/restore, settle); the combined **"New entry"** creates a
+  counterparty **+ an initial debt**; plus edit/delete person. Summary cards use the authoritative
+  **`/debts/summary`** (gross totals + net); per-direction **counts** come from the list. The list
+  still does client-side search/filter/8-per-page paging, fetching **all** counterparties via the
+  new `getAll` helper. Money rendered with decimals (`formatAmount`/`formatAmountDH`). Cross-feature:
+  the **Summary** screen's `Outstanding` now consumes live `counterparties`. Verified end-to-end in
+  a headless browser against the running stack. Remaining domain features (budget, transactions,
+  savings, history) stay on the mock layer.
+- **API client pagination (2026-07-01):** the Axios response interceptor now **preserves the
+  `pagination` block** (the `{ data }` unwrap previously dropped it); added typed `getPage<T>` and
+  `getAll<T>` helpers to `lib/api-client.ts` for paginated list endpoints. See `auth-client.md`.
+
 ## OPEN — must be decided with the user before implementing
 
 > Do **not** invent any of the following. Ask, then record here.
 
 ### API contract
-- Endpoints, payloads, and response shapes (owned by backend; undecided). The frontend currently
-  runs on the mock layer; the domain types in `src/types` and the per-feature `api/` signatures
-  are our **expected** shape and must be reconciled with the confirmed backend contract when it
-  lands (see `mock-data.md` for the swap recipe). Build real types from the confirmed contract.
+- **Auth** and the **debt/loan ledger** (the **People** feature) are decided + implemented and
+  consume the live backend (see the Confirmed entries above; `backend/docs/auth.md` /
+  `backend/docs/debts.md`). The **remaining** domain features — budget, transactions, savings,
+  history — still run on the mock layer; their `src/types` models and per-feature `api/` signatures
+  are our **expected** shape and must be reconciled with the confirmed backend contract when each
+  lands (see `mock-data.md` for the swap recipe).
 
 ### Auth
 - Sign-up / sign-in / sign-out, the session store, route guards, and transparent refresh are all

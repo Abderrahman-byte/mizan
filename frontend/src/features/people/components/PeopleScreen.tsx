@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardHeading, Icon, Pill } from '@/components';
-import type { Person } from '@/types';
-import { formatDH, formatNumber } from '@/utils/format';
+import { formatAmountDH, formatNumber } from '@/utils/format';
 import { usePeople } from '../stores/people-store';
 import { PersonRow } from './PersonRow';
 import { PersonDetail } from './PersonDetail';
@@ -14,9 +13,9 @@ type BalanceFilter = 'all' | 'owed' | 'owe';
 const PAGE_SIZE = 8;
 
 export function PeopleScreen() {
-  const { people, historyFor } = usePeople();
-  const [selected, setSelected] = useState<Person | null>(null);
-  const [mobileOpen, setMobileOpen] = useState<Person | null>(null);
+  const { counterparties, summary } = usePeople();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [mobileId, setMobileId] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<BalanceFilter>('all');
@@ -24,38 +23,38 @@ export function PeopleScreen() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return people.filter((p) => {
+    return counterparties.filter((p) => {
       if (filter === 'owed' && p.balance <= 0) return false;
       if (filter === 'owe' && p.balance >= 0) return false;
-      if (q && !p.name.toLowerCase().includes(q) && !p.note.toLowerCase().includes(q)) {
+      if (q && !p.name.toLowerCase().includes(q) && !(p.note ?? '').toLowerCase().includes(q)) {
         return false;
       }
       return true;
     });
-  }, [people, query, filter]);
+  }, [counterparties, query, filter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  // Reset to the first page whenever the result set changes.
   useEffect(() => setPage(1), [query, filter]);
-  // Clamp if the list shrinks (e.g. people removed) below the current page.
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const totals = useMemo(() => {
-    const loans = people.filter((p) => p.balance > 0).reduce((s, p) => s + p.balance, 0);
-    const debt = people.filter((p) => p.balance < 0).reduce((s, p) => s + p.balance, 0);
-    return {
-      loans,
-      debt,
-      net: loans + debt,
-      oweCount: people.filter((p) => p.balance > 0).length,
-      debtCount: people.filter((p) => p.balance < 0).length,
-    };
-  }, [people]);
+  const counts = useMemo(
+    () => ({
+      owe: counterparties.filter((p) => p.balance > 0).length,
+      debt: counterparties.filter((p) => p.balance < 0).length,
+    }),
+    [counterparties],
+  );
 
-  const activeDesktop = (selected && filtered.includes(selected) ? selected : null) ?? filtered[0];
+  // Money totals come from the authoritative backend summary (gross by direction).
+  const loans = summary?.totalOwedToMe ?? 0;
+  const debt = summary?.totalIOwe ?? 0;
+  const net = summary?.net ?? 0;
+  const netStr = `${net >= 0 ? '+' : '−'}${formatNumber(Math.abs(net))} DH`;
 
-  const netStr = `${totals.net >= 0 ? '+' : '−'}${formatNumber(Math.abs(totals.net))} DH`;
+  const mobileOpen = mobileId != null ? counterparties.find((p) => p.id === mobileId) ?? null : null;
+  const activeDesktop =
+    (selectedId != null ? filtered.find((p) => p.id === selectedId) : undefined) ?? filtered[0];
 
   const closeSearch = () => {
     setSearchOpen(false);
@@ -92,7 +91,7 @@ export function PeopleScreen() {
         </div>
       ) : (
         <div className="flex items-center justify-between px-2 pb-2.5 pt-1">
-          <CardHeading>People · {people.length}</CardHeading>
+          <CardHeading>People · {counterparties.length}</CardHeading>
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
@@ -106,9 +105,9 @@ export function PeopleScreen() {
         </div>
       )}
       <div className="flex gap-1.5 px-2 pb-2.5">
-        <FilterTab label="All" count={people.length} active={filter === 'all'} onClick={() => setFilter('all')} />
-        <FilterTab label="Owed to you" count={totals.oweCount} color={OWE_YOU} active={filter === 'owed'} onClick={() => setFilter('owed')} />
-        <FilterTab label="You owe" count={totals.debtCount} color={YOU_OWE} active={filter === 'owe'} onClick={() => setFilter('owe')} />
+        <FilterTab label="All" count={counterparties.length} active={filter === 'all'} onClick={() => setFilter('all')} />
+        <FilterTab label="Owed to you" count={counts.owe} color={OWE_YOU} active={filter === 'owed'} onClick={() => setFilter('owed')} />
+        <FilterTab label="You owe" count={counts.debt} color={YOU_OWE} active={filter === 'owe'} onClick={() => setFilter('owe')} />
       </div>
       {filtered.length === 0 ? (
         <div className="px-2 py-8 text-center text-[13px] text-ink-soft">
@@ -117,12 +116,12 @@ export function PeopleScreen() {
       ) : (
         paged.map((person) => (
           <PersonRow
-            key={person.name}
+            key={person.id}
             person={person}
-            active={activeDesktop?.name === person.name}
+            active={activeDesktop?.id === person.id}
             onClick={() => {
-              setSelected(person);
-              setMobileOpen(person);
+              setSelectedId(person.id);
+              setMobileId(person.id);
             }}
           />
         ))
@@ -159,8 +158,7 @@ export function PeopleScreen() {
       {/* summary cards — hidden on mobile while drilled into a person */}
       <div
         className={
-          'grid grid-cols-1 gap-0 lg:grid-cols-3 lg:gap-4' +
-          (mobileOpen ? ' hidden lg:grid' : '')
+          'grid grid-cols-1 gap-0 lg:grid-cols-3 lg:gap-4' + (mobileOpen ? ' hidden lg:grid' : '')
         }
       >
         {/* mobile: single combined card */}
@@ -176,27 +174,27 @@ export function PeopleScreen() {
             <div className="flex-1 rounded-[var(--radius)] bg-surface px-3 py-2.5">
               <div className="text-[11.5px] font-extrabold text-ink-soft">Owed to you</div>
               <div className="num text-base font-black" style={{ color: OWE_YOU }}>
-                {formatDH(totals.loans)}
+                {formatAmountDH(loans)}
               </div>
             </div>
             <div className="flex-1 rounded-[var(--radius)] bg-surface px-3 py-2.5">
               <div className="text-[11.5px] font-extrabold text-ink-soft">You owe</div>
               <div className="num text-base font-black" style={{ color: YOU_OWE }}>
-                {formatDH(Math.abs(totals.debt))}
+                {formatAmountDH(debt)}
               </div>
             </div>
           </div>
         </Card>
 
         {/* desktop: three cards */}
-        <SummaryCard className="hidden lg:flex" heading="Owed to you" value={formatDH(totals.loans)} valueColor={OWE_YOU} sub={`across ${totals.oweCount} people`} />
-        <SummaryCard className="hidden lg:flex" heading="You owe" value={formatDH(Math.abs(totals.debt))} valueColor={YOU_OWE} sub={`across ${totals.debtCount} people`} />
+        <SummaryCard className="hidden lg:flex" heading="Owed to you" value={formatAmountDH(loans)} valueColor={OWE_YOU} sub={`across ${counts.owe} people`} />
+        <SummaryCard className="hidden lg:flex" heading="You owe" value={formatAmountDH(debt)} valueColor={YOU_OWE} sub={`across ${counts.debt} people`} />
         <SummaryCard
           className="hidden lg:flex"
           heading="Net position"
           value={netStr}
           valueColor="var(--accent-ink)"
-          sub={totals.net >= 0 ? 'net positive — more is owed to you' : 'net negative — you owe more overall'}
+          sub={net >= 0 ? 'net positive — more is owed to you' : 'net negative — you owe more overall'}
           accent
         />
       </div>
@@ -206,8 +204,11 @@ export function PeopleScreen() {
         {mobileOpen ? (
           <PersonDetail
             person={mobileOpen}
-            history={historyFor(mobileOpen)}
-            onBack={() => setMobileOpen(null)}
+            onBack={() => setMobileId(null)}
+            onDeleted={() => {
+              setMobileId(null);
+              setSelectedId(null);
+            }}
           />
         ) : (
           list
@@ -216,7 +217,11 @@ export function PeopleScreen() {
       <div className="hidden grid-cols-[1.5fr_1fr] items-start gap-4 lg:grid">
         {list}
         {activeDesktop && (
-          <PersonDetail person={activeDesktop} history={historyFor(activeDesktop)} />
+          <PersonDetail
+            key={activeDesktop.id}
+            person={activeDesktop}
+            onDeleted={() => setSelectedId(null)}
+          />
         )}
       </div>
     </>
@@ -248,9 +253,7 @@ function FilterTab({
           : 'border-line text-ink-soft hover:bg-surface-2')
       }
     >
-      {color && (
-        <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-      )}
+      {color && <span className="h-2 w-2 rounded-full" style={{ background: color }} />}
       {label}
       <span className="num text-ink-faint">{count}</span>
     </button>
@@ -278,10 +281,7 @@ function SummaryCard({
       style={accent ? { background: 'var(--accent-soft)', borderColor: 'var(--accent-tint)' } : undefined}
     >
       <CardHeading style={accent ? { color: 'var(--accent-ink)' } : undefined}>{heading}</CardHeading>
-      <div
-        className="num whitespace-nowrap font-head text-3xl font-bold"
-        style={{ color: valueColor }}
-      >
+      <div className="num whitespace-nowrap font-head text-3xl font-bold" style={{ color: valueColor }}>
         {value}
       </div>
       <div

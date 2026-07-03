@@ -4,9 +4,9 @@ import { MODE_LABELS, modeColor } from '@/config/modes';
 import { useBudget } from '@/features/budget';
 import { useTransactions } from '@/features/transactions';
 import { useSavings } from '@/features/savings';
-import { usePeople } from '@/features/people';
+import { usePeople, type Counterparty } from '@/features/people';
 import { useHistory } from '@/features/history';
-import type { MonthHistory, Person, SavingsGoal } from '@/types';
+import type { MonthHistory, SavingsGoal } from '@/types';
 import { formatDH, formatShort } from '@/utils/format';
 import { PageContainer, PageHeader } from '../layout';
 import { buildSummaryInsights, type SummaryInsights } from './summary-insights';
@@ -16,7 +16,7 @@ export function SummaryPage() {
   const { categories, loading: budgetLoading, error: budgetError } = useBudget();
   const { actuals, loading: txLoading, error: txError } = useTransactions();
   const { savings, loading: savingsLoading, error: savingsError } = useSavings();
-  const { people, loading: peopleLoading, error: peopleError } = usePeople();
+  const { counterparties, loading: peopleLoading, error: peopleError } = usePeople();
   const { history, trackingSince, loading: histLoading, error: histError } = useHistory();
 
   const insights = useMemo(
@@ -85,7 +85,7 @@ export function SummaryPage() {
           <SavingsGrowth history={history} savings={savings} />
         </div>
 
-        <Outstanding people={people} />
+        <Outstanding people={counterparties} />
       </PageContainer>
     </>
   );
@@ -332,7 +332,7 @@ function SavingsGrowth({ history, savings }: { history: MonthHistory[]; savings:
   );
 }
 
-function Outstanding({ people }: { people: Person[] }) {
+function Outstanding({ people }: { people: Counterparty[] }) {
   const loans = people.filter((p) => p.balance > 0).reduce((s, p) => s + p.balance, 0);
   const debt = Math.abs(people.filter((p) => p.balance < 0).reduce((s, p) => s + p.balance, 0));
   const net = loans - debt;

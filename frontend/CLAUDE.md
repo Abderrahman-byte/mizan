@@ -65,12 +65,14 @@ per-feature React Context stores (no extra library); the **Bloom** design system
 component library (`src/components`); the five screens (Dashboard, Summary, Ledger, Budget Modes,
 People); and the typed mock-data layer (no API yet). See `docs/decisions.md`.
 
-**Open (ask before acting):** the **API contract** for the domain features (owned by backend,
-undecided — those features run on the mock layer; reconcile `src/types` + feature `api/` with the
-confirmed contract per `docs/mock-data.md`). **Auth is built** — sign-up/in/out, the `useAuth`
-session store, route guards, and transparent token refresh against the confirmed contract (see
-`docs/auth-client.md`); only **password reset** (backend 501 stubs) and **profile editing** remain
-open there.
+**Live against the backend:** **Auth** (`docs/auth-client.md`) and the **People / debt-loan ledger**
+(`features/people`, full debt management against `backend/docs/debts.md` — see `docs/decisions.md`,
+2026-07-01).
+
+**Open (ask before acting):** the **API contract** for the *remaining* domain features — budget,
+transactions, savings, history — is still undecided; those run on the mock layer (reconcile
+`src/types` + feature `api/` with the confirmed contract per `docs/mock-data.md`). For **auth**,
+only **password reset** (backend 501 stubs) and **profile editing** remain open.
 
 ## Before you start a frontend task
 

@@ -7,9 +7,13 @@ change. This is a deliberate, confirmed decision (see `decisions.md`).
 > The backend API contract is **not finalized**. The domain types and `api/` signatures here are
 > our *expected* shape; reconcile them with the confirmed backend contract when it lands.
 
-> **Exception — auth.** The auth contract *is* confirmed and implemented (`backend/docs/auth.md`),
-> so `features/auth/api/auth-api.ts` calls the real backend through the Axios client and does **not**
-> use this mock layer. Everything below applies to the still-open domain features only.
+> **Exceptions — live features.** **Auth** (`backend/docs/auth.md`) and the **People / debt-loan
+> ledger** (`backend/docs/debts.md`) are confirmed + implemented, so `features/auth/api/auth-api.ts`
+> and `features/people/api/people-api.ts` call the real backend through the Axios client and do
+> **not** use this mock layer (their types live in the feature, not `src/types`). Everything below
+> applies to the still-open domain features only (budget, transactions, savings, history). The
+> mock `db.people` / `db.personHistory` and the `Person` / `PersonEntry` types are now unused by the
+> People feature and remain only as dormant seed data.
 
 ## Pieces
 
