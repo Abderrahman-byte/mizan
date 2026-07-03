@@ -84,5 +84,39 @@ so there is no amount ceiling.
 
 - Migration: `99ef2d53f976`.
 
+## `categories`
+
+Owned by the `transactions` module (`app/modules/transactions/models.py`). Per-user spending
+categories the ledger references (and the budget feature will plan against later). Every account
+starts with a pre-created 14-entry default set — seeded at registration, backfilled for
+pre-existing users by the migration. Full feature spec/rules in `docs/transactions.md`.
+
+| Column    | Type          | Constraints                            | Notes                                     |
+|-----------|---------------|----------------------------------------|--------------------------------------------|
+| `user_id` | `BigInteger`  | NOT NULL, FK→`users.id` (CASCADE), idx | Owner. `ix_categories_user_id`.            |
+| `name`    | `String(100)` | NOT NULL                               | Category display name.                     |
+| `icon`    | `String(50)`  | NOT NULL                               | Opaque frontend icon token (e.g. `"cart"`). |
+
+- **Case-insensitive uniqueness per user:** functional unique index `uq_categories_user_name`
+  on `(user_id, lower(name))` — one "Groceries" per user. Violation → `409 CATEGORY_NAME_TAKEN`.
+- Migration: `d17b6fd71465` (incl. the default-set backfill).
+
+## `transactions`
+
+Owned by the `transactions` module. One ledger entry (expense or income). The
+category↔direction rule — `OUT` carries a category, `IN` never does — is service-enforced with
+the CHECK below as backstop.
+
+| Column        | Type            | Constraints                            | Notes                                     |
+|---------------|-----------------|----------------------------------------|--------------------------------------------|
+| `user_id`     | `BigInteger`    | NOT NULL, FK→`users.id` (CASCADE), idx | Owner. `ix_transactions_user_id`.          |
+| `category_id` | `BigInteger`    | NULL, FK→`categories.id`, idx          | **No** ondelete cascade — delete is blocked in the service (FK restricts as backstop). NULL exactly when `direction = IN` (CHECK `ck_transactions_category_direction`). `ix_transactions_category_id`. |
+| `direction`   | enum `transaction_direction` | NOT NULL                  | `IN` \| `OUT` (native PG enum).            |
+| `amount`      | `NUMERIC(12,2)` | NOT NULL, CHECK > 0                    | `ck_transactions_amount_positive`. DH; no currency column. |
+| `description` | `String(255)`   | NOT NULL                               | The entry's label.                         |
+| `occurred_on` | `Date`          | NOT NULL                               | Calendar date (defaults to today).         |
+
+- Migration: `d17b6fd71465`.
+
 > Open: all other non-auth tables (budgeting/spending-mode tables, savings-goal tables). See
 > `decisions.md`.

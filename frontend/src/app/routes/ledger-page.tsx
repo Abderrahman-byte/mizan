@@ -1,42 +1,29 @@
 import { useState } from 'react';
 import { Button, Icon } from '@/components';
 import { useBudget } from '@/features/budget';
-import { useHistory } from '@/features/history';
 import {
   AddTransactionModal,
   LedgerScreen,
-  useTransactions,
+  useLedger,
   type LedgerViewModel,
 } from '@/features/transactions';
 import { computeMode } from '@/utils/budget';
-import { MONTHS_SHORT } from '@/utils/date';
 import { PageContainer, PageHeader } from '../layout';
-import { useMonthMode } from '../hooks/use-month-mode';
 import { PageError, PageLoading } from './page-status';
 
-const FULL_MONTH: Record<string, string> = {
-  Jan: 'January', Feb: 'February', Mar: 'March', Apr: 'April', May: 'May', Jun: 'June',
-  Jul: 'July', Aug: 'August', Sep: 'September', Oct: 'October', Nov: 'November', Dec: 'December',
-};
-
+/* The Ledger runs on the live transactions backend (real calendar months, fetched per month);
+   the mode recap still joins the mock budget plan (`useBudget().totals`) by category name until
+   the budget contract lands — see docs/decisions.md (2026-07-03). */
 export function LedgerPage() {
-  const { categories, loading: budgetLoading, error: budgetError } = useBudget();
-  const {
-    transactions,
-    addTransaction,
-    setTransactionAmount,
-    loading: txLoading,
-    error: txError,
-  } = useTransactions();
-  const { history, loading: histLoading, error: histError } = useHistory();
-  const { totals, totalActual, mode, incomeIn } = useMonthMode();
+  const { totals, loading: budgetLoading, error: budgetError } = useBudget();
+  const ledger = useLedger();
   const [adding, setAdding] = useState(false);
-  const [monthIdx, setMonthIdx] = useState<number | null>(null);
 
+  const monthName = ledger.monthLabel.split(' ')[0];
   const header = (
     <PageHeader
-      title="June ledger"
-      mobileTitle="June"
+      title={`${monthName} ledger`}
+      mobileTitle={monthName}
       subtitle="Every transaction this month — tap any amount to edit and your month-mode updates live."
       action={
         <Button onClick={() => setAdding(true)} className="max-lg:px-3">
@@ -47,10 +34,10 @@ export function LedgerPage() {
     />
   );
 
-  const loading = budgetLoading || txLoading || histLoading;
-  const error = budgetError || txError || histError;
+  const loading = budgetLoading || ledger.loading;
+  const error = budgetError || ledger.error;
 
-  if (loading || error || history.length === 0) {
+  if (loading || error) {
     return (
       <>
         {header}
@@ -61,41 +48,35 @@ export function LedgerPage() {
     );
   }
 
-  const last = history.length - 1;
-  const cur = Math.min(monthIdx ?? last, last);
-  const hm = history[cur];
-  const isCurrent = cur === last;
-  const monthActual = isCurrent ? totalActual : hm.spent;
-
-  // The transactions dated within the displayed month (ISO `YYYY-MM` prefix).
-  const ym = `20${hm.year}-${String(MONTHS_SHORT.indexOf(hm.month) + 1).padStart(2, '0')}`;
-  const monthTransactions = transactions.filter((t) => t.date.startsWith(ym));
-
   const view: LedgerViewModel = {
-    modeIdx: (isCurrent ? mode : computeMode(monthActual, totals)).idx,
+    modeIdx: computeMode(ledger.totalOut, totals).idx,
     totals,
-    totalActual: monthActual,
-    incomeIn: isCurrent ? incomeIn : hm.income,
-    monthLabel: `${FULL_MONTH[hm.month]} 20${hm.year}`,
-    isCurrent,
-    canPrev: cur > 0,
-    canNext: cur < last,
-    onPrev: () => setMonthIdx(Math.max(0, cur - 1)),
-    onNext: () => setMonthIdx(Math.min(last, cur + 1)),
-    transactions: monthTransactions,
+    totalActual: ledger.totalOut,
+    incomeIn: ledger.totalIn,
+    monthLabel: ledger.monthLabel,
+    isCurrent: ledger.isCurrent,
+    canPrev: ledger.canPrev,
+    canNext: ledger.canNext,
+    onPrev: ledger.goPrev,
+    onNext: ledger.goNext,
+    transactions: ledger.transactions,
   };
 
   return (
     <>
       {header}
       <PageContainer>
-        <LedgerScreen view={view} categories={categories} onAmountChange={setTransactionAmount} />
+        <LedgerScreen
+          view={view}
+          categories={ledger.categories}
+          onAmountChange={ledger.setTransactionAmount}
+        />
       </PageContainer>
       {adding && (
         <AddTransactionModal
-          categories={categories}
+          categories={ledger.categories}
           onClose={() => setAdding(false)}
-          onAdd={addTransaction}
+          onAdd={ledger.addTransaction}
         />
       )}
     </>

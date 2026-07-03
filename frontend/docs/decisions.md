@@ -181,18 +181,48 @@ ask before assuming.
   savings card, in `features/settings/.../SettingsScreen.tsx`): the app is an open-source project
   built by Abderrahmane Elasri for personal use, with a link to the GitHub repo
   (`https://github.com/Abderrahman-byte/mizan`) for suggestions. No new route or nav item.
+- **Ledger / transactions live integration (2026-07-03):** the **Ledger screen** is wired to the
+  live transactions backend (`backend/docs/transactions.md`) — **scope deliberately Ledger-only**:
+  Dashboard/Summary/Budget-Modes keep aggregating the mock June data through the unchanged mock
+  `TransactionsProvider` + `useMonthMode` until the budget/history contracts land. Key decisions
+  (all confirmed by the user):
+  - **Real calendar months:** the Ledger is no longer pinned to the mock demo timeline. Current
+    month = actually today; prev/next walk real months, each fetched live via `?month=YYYY-MM`
+    (`getAll` walks pagination); navigation **floor = the account-creation month**
+    (`user.createdAt`). Past months stay **read-only** (inline edit only on the current month).
+  - **New live plumbing inside `features/transactions`** alongside the dormant mock pieces:
+    `types/ledger.ts` (`LedgerCategory`, `NewLedgerTransaction`), `api/ledger-api.ts` (wire
+    mapping: `"IN"/"OUT"` ↔ `'in'/'out'`, decimal-strings ↔ numbers, embedded category object →
+    display name with `"Income"` for null, unknown icon tokens → `wallet`), and
+    `stores/ledger-store.tsx` (`LedgerProvider`/`useLedger`: month state, live categories, month
+    totals, `addTransaction` (awaited; modal shows inline errors like the People modals),
+    `setTransactionAmount` (optimistic, refetches the month on failure)).
+  - **Auth facts as props:** `LedgerProvider` takes `enabled`/`floorMonth` props composed by a
+    `LiveLedgerProvider` wrapper in `app-providers.tsx` — features must not import each other.
+  - **Mock-plan seam:** the Ledger's mode recap still joins the mock budget plan
+    (`useBudget().totals`); live categories (the picker + row icons) are joined to plan rows **by
+    name**. Reconcile when the budget contract lands.
+  - **`AddTransactionModal`** now selects live categories by id, dates default to the real today,
+    and submits async with inline error display.
+  - Verified end-to-end in a headless browser against a fresh live stack (signup → seeded
+    categories → add expense/income → totals → inline edit persisted across reload → month-nav
+    floor). Console 401s on the auth pages are the pre-existing `PeopleProvider` fetching while
+    unauthenticated (unrelated, not introduced by this change).
 
 ## OPEN — must be decided with the user before implementing
 
 > Do **not** invent any of the following. Ask, then record here.
 
 ### API contract
-- **Auth** and the **debt/loan ledger** (the **People** feature) are decided + implemented and
-  consume the live backend (see the Confirmed entries above; `backend/docs/auth.md` /
-  `backend/docs/debts.md`). The **remaining** domain features — budget, transactions, savings,
-  history — still run on the mock layer; their `src/types` models and per-feature `api/` signatures
-  are our **expected** shape and must be reconciled with the confirmed backend contract when each
-  lands (see `mock-data.md` for the swap recipe).
+- **Auth**, the **debt/loan ledger** (the **People** feature), and the **transactions ledger**
+  (the **Ledger** screen) are decided + implemented and consume the live backend (see the
+  Confirmed entries above; `backend/docs/auth.md` / `backend/docs/debts.md` /
+  `backend/docs/transactions.md`). The **remaining** domain features — budget, savings,
+  history — still run on the mock layer; their `src/types` models and per-feature `api/`
+  signatures are our **expected** shape and must be reconciled with the confirmed backend
+  contract when each lands (see `mock-data.md` for the swap recipe). Note the mock
+  `TransactionsProvider` still feeds Dashboard/Summary/Modes aggregates (decision above) —
+  retire it when budget/history go live.
 
 ### Auth
 - Sign-up / sign-in / sign-out, the session store, route guards, and transparent refresh are all

@@ -187,6 +187,37 @@ isn't decided — and Claude Code must ask before assuming it.
   literal / duplicate in-file names → 400 `VALIDATION_ERROR`. UI lives on the People screen
   (client-side blob download + file picker; frontend `docs/decisions.md`). Full contract in
   `docs/debts.md`.
+- **Transactions ledger (2026-07-03, implemented & verified):** the monthly spending/income
+  ledger (the frontend Ledger screen's backend) is built and verified end-to-end against a
+  disposable stack (38-check script: seeding, CRUD, filters, summary, error codes, ownership
+  scoping, DB CHECK backstop). `transactions` module (`app/modules/transactions/`:
+  `enums`/`models`/`schemas`/`repository`/`service`/`engine`/`exceptions`), routes in
+  `app/api/v1/categories.py` + `app/api/v1/transactions.py`, migration `d17b6fd71465`
+  (tables in `docs/schema.md`; `alembic check` clean, upgrade/downgrade roundtrip verified).
+  Full spec in `docs/transactions.md`. Key decisions (all confirmed by the user):
+  - **Model:** `transactions` rows (`direction` `IN`/`OUT`, `amount`, `description`,
+    `occurred_on`) + per-user `categories` (name unique per user case-insensitively → **409
+    `CATEGORY_NAME_TAKEN`**; `icon` stored as an opaque frontend token).
+  - **Category↔direction rule:** expenses (`OUT`) require a category; income (`IN`) must have
+    none → **409 `CATEGORY_DIRECTION_MISMATCH`** (service-enforced on create *and* update, DB
+    CHECK as backstop; PATCH to `IN` clears the category, PATCH to `OUT` needs one supplied).
+  - **Pre-created category set:** 14 defaults (from the frontend mock) seeded **at registration**
+    (documented cross-module call `auth.service.register` → `transactions.service.
+    seed_default_categories`, same transaction) and **backfilled for existing users** by the
+    migration.
+  - **Full CRUD** on transactions; categories CRUD with **delete blocked** while referenced →
+    **409 `CATEGORY_HAS_TRANSACTIONS`**.
+  - **List:** `GET /transactions` paginates, filters `?month=YYYY-MM` / `?direction` /
+    `?category_id`, newest first; embeds slim `category` (null for income). `GET /categories`
+    is deliberately **unpaginated** (bounded set; the picker needs all — documented exception).
+  - **`GET /transactions/summary?month=` (required):** `totalOut`/`totalIn` + per-category OUT
+    totals, aggregated in SQL (the paginated list can't feed client-side totals).
+  - **Standalone in v1:** no link to budgeting/spending-mode tables yet.
+  - **Error codes:** `CATEGORY_NAME_TAKEN`, `CATEGORY_HAS_TRANSACTIONS`,
+    `CATEGORY_DIRECTION_MISMATCH` (409); `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND` (404).
+  - **Backend-only scope:** the frontend Ledger stays on mock data; wiring it live is a separate
+    task (reconciliation notes in `docs/transactions.md`).
+  - See `docs/transactions.md` and `docs/schema.md`.
 - **Deployment (2026-07-03):** single VPS running the prod compose stack, fronted by a **host
   nginx** (not containerized) that terminates TLS — config in `deploy/nginx/mizan.conf`. Domain
   **`mizan.abderrahmane.ma`** behind the **Cloudflare proxy** (orange cloud); TLS uses a
@@ -205,6 +236,8 @@ isn't decided — and Claude Code must ask before assuming it.
 - The `users` and `refresh_tokens` tables are **decided** (see Confirmed above; `docs/schema.md`).
 - The **debt-ledger tables** (`counterparties`, `debts`, `repayments`) are **built and migrated**
   (`99ef2d53f976`; see Confirmed above; `docs/schema.md`).
+- The **transactions-ledger tables** (`categories`, `transactions`) are **built and migrated**
+  (`d17b6fd71465`; see Confirmed above; `docs/schema.md`).
 - The **budgeting/spending-mode** and **savings-goal** tables remain undecided.
 
 ### API endpoints
@@ -215,6 +248,8 @@ isn't decided — and Claude Code must ask before assuming it.
 - The **debt-ledger endpoint surface** (counterparties, debts, repayments, summary,
   export/import — 19 routes) is **fully implemented** (request/response field lists, pagination, money serialization, filters,
   write-off, error codes; see `docs/debts.md`).
+- The **transactions-ledger endpoint surface** (categories, transactions, month summary —
+  11 routes) is **fully implemented** (see `docs/transactions.md`).
 - All other non-auth routes (budgeting, savings) remain entirely undecided.
 
 ### Auth (remaining open items)
@@ -230,7 +265,7 @@ isn't decided — and Claude Code must ask before assuming it.
   in Confirmed above and `docs/debts.md`.
 - Savings-goal tracking rules.
 - Any further business-rule error codes (`<RULE>_VIOLATION`) for budgeting/savings (the debt
-  ledger's codes are recorded in `docs/debts.md`).
+  ledger's codes are in `docs/debts.md`; the transactions ledger's in `docs/transactions.md`).
 
 ### Project specifics to fill into conventions.md
 - Final module list.

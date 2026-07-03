@@ -67,14 +67,17 @@ per-feature React Context stores (no extra library); the **Bloom** design system
 component library (`src/components`); the five screens (Dashboard, Summary, Ledger, Budget Modes,
 People); and the typed mock-data layer (no API yet). See `docs/decisions.md`.
 
-**Live against the backend:** **Auth** (`docs/auth-client.md`) and the **People / debt-loan ledger**
+**Live against the backend:** **Auth** (`docs/auth-client.md`), the **People / debt-loan ledger**
 (`features/people`, full debt management against `backend/docs/debts.md` — see `docs/decisions.md`,
-2026-07-01).
+2026-07-01), and the **Ledger screen** (`features/transactions` live pieces against
+`backend/docs/transactions.md` — real calendar months, floor = account creation; see
+`docs/decisions.md`, 2026-07-03).
 
-**Open (ask before acting):** the **API contract** for the *remaining* domain features — budget,
-transactions, savings, history — is still undecided; those run on the mock layer (reconcile
-`src/types` + feature `api/` with the confirmed contract per `docs/mock-data.md`). For **auth**,
-only **password reset** (backend 501 stubs) and **profile editing** remain open.
+**Open (ask before acting):** the **API contract** for budget, savings, and history is still
+undecided; those run on the mock layer. The mock `TransactionsProvider` still feeds the
+Dashboard/Summary/Modes aggregates (Ledger-only live scope, 2026-07-03) — retire it when
+budget/history go live. For **auth**, only **password reset** (backend 501 stubs) and **profile
+editing** remain open.
 
 ## Before you start a frontend task
 

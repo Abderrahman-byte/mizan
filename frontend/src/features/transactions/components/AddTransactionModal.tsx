@@ -1,43 +1,58 @@
 import { useState } from 'react';
 import { FieldLabel, Icon, Modal, TextField } from '@/components';
-import type { Category, TransactionDirection } from '@/types';
+import type { TransactionDirection } from '@/types';
 import { cn } from '@/utils/cn';
-import type { NewTransaction } from '../api/transactions-api';
-
-/** Today within the app's fixed demo timeline (June 2026). */
-const TODAY = '2026-06-29';
+import { todayISO } from '@/utils/date';
+import type { LedgerCategory, NewLedgerTransaction } from '../types/ledger';
 
 export interface AddTransactionModalProps {
-  categories: Category[];
+  categories: LedgerCategory[];
   onClose: () => void;
-  onAdd: (tx: NewTransaction) => void;
+  /** Create the entry against the backend. Rejects with the normalized API error. */
+  onAdd: (tx: NewLedgerTransaction) => Promise<void>;
 }
 
-/** Add an expense or income to the current month's ledger. */
+/** Add an expense or income to the ledger (dated today by default). */
 export function AddTransactionModal({ categories, onClose, onAdd }: AddTransactionModalProps) {
-  const [direction, setDirection] = useState<TransactionDirection>('out');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Groceries');
-  const [description, setDescription] = useState('');
-  const [date, setDate] = useState(TODAY);
-
-  const valid = Number(amount) > 0;
-  // expense categories with Savings pushed to the end
+  const today = todayISO();
+  // Expense categories with Savings pushed to the end.
   const expenseCats = [
     ...categories.filter((c) => c.name !== 'Savings'),
     ...categories.filter((c) => c.name === 'Savings'),
   ];
 
-  const submit = () => {
-    if (!valid) return;
-    onAdd({
-      date,
-      description: description.trim() || (direction === 'in' ? 'Income' : category),
-      category: direction === 'in' ? 'Income' : category,
-      amount: Math.round(Number(amount)),
-      direction,
-    });
-    onClose();
+  const [direction, setDirection] = useState<TransactionDirection>('out');
+  const [amount, setAmount] = useState('');
+  const [categoryId, setCategoryId] = useState<number | null>(expenseCats[0]?.id ?? null);
+  const [description, setDescription] = useState('');
+  const [date, setDate] = useState(today);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const category = categories.find((c) => c.id === categoryId);
+  const valid = Number(amount) > 0 && (direction === 'in' || category != null);
+
+  const submit = async () => {
+    if (!valid || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onAdd({
+        direction,
+        amount: Math.round(Number(amount)),
+        description:
+          description.trim() || (direction === 'in' ? 'Income' : (category?.name ?? '')),
+        categoryId: direction === 'out' ? (categoryId as number) : null,
+        date,
+      });
+      onClose();
+    } catch (err) {
+      setError(
+        (err as { message?: string })?.message ??
+          'Could not save this transaction. Please try again.',
+      );
+      setSaving(false);
+    }
   };
 
   const amtColor = direction === 'in' ? 'var(--good)' : 'var(--ink)';
@@ -49,10 +64,11 @@ export function AddTransactionModal({ categories, onClose, onAdd }: AddTransacti
       footer={
         <button
           className="mt-[22px] flex w-full items-center justify-center gap-2 rounded-[var(--radius)] bg-accent p-[13px] text-[15px] font-bold text-white disabled:pointer-events-none disabled:opacity-50"
-          disabled={!valid}
+          disabled={!valid || saving}
           onClick={submit}
         >
-          <Icon name="check" size={17} /> Add {direction === 'in' ? 'income' : 'expense'}
+          <Icon name="check" size={17} />{' '}
+          {saving ? 'Saving…' : `Add ${direction === 'in' ? 'income' : 'expense'}`}
         </button>
       }
     >
@@ -90,9 +106,9 @@ export function AddTransactionModal({ categories, onClose, onAdd }: AddTransacti
           <div className="flex flex-wrap gap-2">
             {expenseCats.map((c) => (
               <CategoryChip
-                key={c.name}
-                on={category === c.name}
-                onClick={() => setCategory(c.name)}
+                key={c.id}
+                on={categoryId === c.id}
+                onClick={() => setCategoryId(c.id)}
               >
                 <Icon name={c.icon} size={16} /> {c.name}
               </CategoryChip>
@@ -121,10 +137,12 @@ export function AddTransactionModal({ categories, onClose, onAdd }: AddTransacti
       <TextField
         type="date"
         value={date}
-        max={TODAY}
+        max={today}
         onChange={(e) => setDate(e.target.value)}
         className="[&::-webkit-calendar-picker-indicator]:cursor-pointer"
       />
+
+      {error && <div className="mt-3 text-[13px] font-semibold text-warn">{error}</div>}
     </Modal>
   );
 }

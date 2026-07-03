@@ -39,6 +39,9 @@ Read the doc relevant to your task. These hold the *how*; this file is just the 
 - **`docs/debts.md`** — debt/loan ledger (**implemented**): counterparties, debts, repayments
   tables; status/over-repayment/write-off rules; the 19-route endpoint surface (incl. the
   `mizan-debts` export/import document); contracts; error codes.
+- **`docs/transactions.md`** — transactions ledger (**implemented**): categories + transactions
+  tables; the category↔direction rule; default-category seeding/backfill; the 11-route endpoint
+  surface (incl. the month summary); contracts; error codes.
 
 ## The layering rule (non-negotiable)
 

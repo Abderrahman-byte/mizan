@@ -10,8 +10,13 @@ change. This is a deliberate, confirmed decision (see `decisions.md`).
 > **Exceptions — live features.** **Auth** (`backend/docs/auth.md`) and the **People / debt-loan
 > ledger** (`backend/docs/debts.md`) are confirmed + implemented, so `features/auth/api/auth-api.ts`
 > and `features/people/api/people-api.ts` call the real backend through the Axios client and do
-> **not** use this mock layer (their types live in the feature, not `src/types`). Everything below
-> applies to the still-open domain features only (budget, transactions, savings, history). The
+> **not** use this mock layer (their types live in the feature, not `src/types`). The **Ledger
+> screen** is also live (2026-07-03): `features/transactions` gained live pieces
+> (`types/ledger.ts`, `api/ledger-api.ts`, `stores/ledger-store.tsx` → `useLedger`) against
+> `backend/docs/transactions.md`. Everything below applies to the domain features still on mock
+> (budget, savings, history) — **plus** the mock `TransactionsProvider`/`useTransactions` in this
+> same feature, which still seeds the Dashboard/Summary/Modes aggregates (`actuals`/`incomeIn`
+> via `useMonthMode`) from the June demo data; retire it when budget/history go live. The
 > mock `db.people` / `db.personHistory` and the `Person` / `PersonEntry` types are now unused by the
 > People feature and remain only as dormant seed data.
 

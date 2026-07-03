@@ -20,6 +20,7 @@ from app.db.base import Base
 # Import feature models here so they register on Base.metadata before --autogenerate runs.
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.debts import models as debts_models  # noqa: F401
+from app.modules.transactions import models as transactions_models  # noqa: F401
 
 config = context.config
 

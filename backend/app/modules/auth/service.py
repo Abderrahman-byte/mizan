@@ -31,6 +31,7 @@ from app.modules.auth.schemas import (
     RegisterResponse,
     UserResponse,
 )
+from app.modules.transactions.service import seed_default_categories
 
 
 async def _open_session(session: AsyncSession, user_id: int) -> tuple[str, str]:
@@ -101,6 +102,11 @@ async def register(session: AsyncSession, data: RegisterRequest) -> RegisterResp
         # Lost the check-then-insert race; the unique constraint is the source of truth.
         await session.rollback()
         raise EmailTakenException()
+
+    # Every account starts with the default category set (decision 2026-07-03). Documented
+    # cross-module call into the transactions service; same transaction, so registration
+    # stays atomic.
+    await seed_default_categories(session, user.id)
 
     access_token, refresh_token = await _open_session(session, user.id)
     await session.commit()

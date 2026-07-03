@@ -1,9 +1,14 @@
+import { useMemo, useState } from 'react';
 import { Card, Eyebrow, Icon, Metric, ModeSpectrum, MonthNav } from '@/components';
 import { MODE_LABELS, modeColor } from '@/config/modes';
 import type { Category, Money, Transaction } from '@/types';
+import { cn } from '@/utils/cn';
 import { formatDH } from '@/utils/format';
 import { formatMonthDay } from '@/utils/date';
 import { TransactionRow } from './TransactionRow';
+
+/** Feed direction filter: everything, expenses only, or income only. */
+type DirectionFilter = 'all' | 'out' | 'in';
 
 /** Everything the Ledger screen needs for the active (or a past) month. */
 export interface LedgerViewModel {
@@ -32,7 +37,36 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
   const over = view.totalActual - view.totals[idx];
   const net = view.incomeIn - view.totalActual;
 
-  const groups = groupByDate(view.transactions);
+  // Feed filters — a view over the loaded month only; the metrics and the mode
+  // recap above always reflect the whole month.
+  const [dirFilter, setDirFilter] = useState<DirectionFilter>('all');
+  const [catFilter, setCatFilter] = useState<string | null>(null);
+
+  const counts = useMemo(
+    () => ({
+      all: view.transactions.length,
+      out: view.transactions.filter((t) => t.direction === 'out').length,
+      in: view.transactions.filter((t) => t.direction === 'in').length,
+    }),
+    [view.transactions],
+  );
+
+  const filtered = useMemo(
+    () =>
+      view.transactions.filter(
+        (t) =>
+          (dirFilter === 'all' || t.direction === dirFilter) &&
+          (catFilter === null || t.category === catFilter),
+      ),
+    [view.transactions, dirFilter, catFilter],
+  );
+
+  const setDirection = (dir: DirectionFilter) => {
+    setDirFilter(dir);
+    if (dir === 'in') setCatFilter(null); // income entries carry no category
+  };
+
+  const groups = groupByDate(filtered);
 
   return (
     <>
@@ -114,6 +148,33 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
 
       {/* feed */}
       <Card flush className="px-4 lg:px-6">
+        {view.transactions.length > 0 && (
+          <div className="pb-1 pt-3">
+            <div className="flex gap-1.5">
+              <FilterTab label="All" count={counts.all} active={dirFilter === 'all'} onClick={() => setDirection('all')} />
+              <FilterTab label="Expenses" count={counts.out} active={dirFilter === 'out'} onClick={() => setDirection('out')} />
+              <FilterTab label="Income" count={counts.in} active={dirFilter === 'in'} onClick={() => setDirection('in')} />
+            </div>
+            {dirFilter !== 'in' && (
+              <div className="-mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:-mx-6 lg:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <FilterTab
+                  label="All categories"
+                  active={catFilter === null}
+                  onClick={() => setCatFilter(null)}
+                />
+                {categories.map((c) => (
+                  <FilterTab
+                    key={c.name}
+                    label={c.name}
+                    icon={c.icon}
+                    active={catFilter === c.name}
+                    onClick={() => setCatFilter(catFilter === c.name ? null : c.name)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {groups.length ? (
           groups.map((g) => (
             <div key={g.date}>
@@ -131,6 +192,11 @@ export function LedgerScreen({ view, categories, onAmountChange }: LedgerScreenP
               ))}
             </div>
           ))
+        ) : view.transactions.length ? (
+          // The month has entries but the active filter matches none of them.
+          <div className="px-2 py-8 text-center text-[13px] text-ink-soft">
+            No transactions match this filter.
+          </div>
         ) : (
           <EmptyMonth label={view.monthLabel} />
         )}
@@ -147,10 +213,43 @@ function EmptyMonth({ label }: { label: string }) {
       </span>
       <div className="text-[15.5px] font-bold text-ink">No transactions in {label}</div>
       <div className="max-w-[38ch] text-[13.5px]">
-        Nothing was recorded this month. Add one from June, or switch months to review your
+        Nothing was recorded this month. Add a transaction, or switch months to review your
         history.
       </div>
     </div>
+  );
+}
+
+/** Small filter pill — same look as the People list's tabs. */
+function FilterTab({
+  label,
+  icon,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon?: Category['icon'];
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12.5px] font-extrabold transition',
+        active
+          ? 'border-accent-tint bg-accent-soft text-accent-ink'
+          : 'border-line text-ink-soft hover:bg-surface-2',
+      )}
+    >
+      {icon && <Icon name={icon} size={14} />}
+      {label}
+      {count !== undefined && <span className="num text-ink-faint">{count}</span>}
+    </button>
   );
 }
 
